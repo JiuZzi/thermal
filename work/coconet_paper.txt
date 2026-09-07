@@ -1,0 +1,1834 @@
+\n--- PAGE 1 ---\nInternationalJournalofComputerVision(2024)132:1748–1775
+https://doi.org/10.1007/s11263-023-01952-1
+CoCoNet: Coupled Contrastive Learning Network with Multi-level
+Feature Ensemble for Multi-modality Image Fusion
+Jinyuan Liu1,2·Runjia Lin1,2·Guanyao Wu1,2·Risheng Liu1,2,3·Zhongxuan Luo1,2·Xin Fan1,2
+Received:5November2022/Accepted:31October2023/Publishedonline:8December2023
+©TheAuthor(s),underexclusivelicencetoSpringerScience+BusinessMedia,LLC,partofSpringerNature2023
+Abstract
+Infrared and visible image fusion targets to provide an informative image by combining complementary information from
+different sensors. Existing learning-based fusion approaches attempt to construct various loss functions to preserve com-
+plementaryfeatures,whileneglectingtodiscovertheinter-relationshipbetweenthetwomodalities,leadingtoredundantor
+eveninvalidinformationonthefusionresults.Moreover,mostmethodsfocusonstrengtheningthenetworkwithanincrease
+indepthwhileneglectingtheimportanceoffeaturetransmission,causingvitalinformationdegeneration.Toalleviatethese
+issues,weproposeacoupledcontrastivelearningnetwork,dubbedCoCoNet,torealizeinfraredandvisibleimagefusioninan
+end-to-endmanner.Concretely,tosimultaneouslyretaintypicalfeaturesfrombothmodalitiesandtoavoidartifactsemerging
+on the fused result, we develop a coupled contrastive constraint in our loss function. In a fused image, its foreground tar-
+get/backgrounddetailpartispulledclosetotheinfrared/visiblesourceandpushedfarawayfromthevisible/infraredsourcein
+therepresentationspace.Wefurtherexploitimagecharacteristicstoprovidedata-sensitiveweights,allowingourlossfunction
+tobuildamorereliablerelationshipwithsourceimages.Amulti-levelattentionmoduleisestablishedtolearnrichhierarchical
+featurerepresentationandtocomprehensivelytransferfeaturesinthefusionprocess.WealsoapplytheproposedCoCoNet
+onmedicalimagefusionofdifferenttypes,e.g.,magneticresonanceimage,positronemissiontomographyimage,andsingle
+photonemissioncomputedtomographyimage.Extensiveexperimentsdemonstratethatourmethodachievesstate-of-the-art
+(SOTA)performanceunderbothsubjectiveandobjectiveevaluation,especiallyinpreservingprominenttargetsandrecovering
+vitaltexturaldetails.
+Keywords Imagefusion·Infraredandvisibleimage·Unsupervisedlearning·Contrastivelearning
+1 Introduction
+CommunicatedbyMing-HsuanYang.
+Multi-sensor images can acquire complementary and com-
+JinyuanLiuandRunjiaLinhavecontributedequallytothiswork.
+prehensiveinformationfromthesamesceneforbettervisual
+B understanding and scene perception, which breaks through
+XinFan
+xin.fan@dlut.edu.cn thelimitationsofsinglesensorimaging(Lietal.,2018).By
+combining important information from different sensors, a
+JinyuanLiu
+atlantis918@hotmail.com compositeimageisgeneratedforfollow-upimageprocessing
+ordecision-making.Inparticular,infraredandvisibleimage
+RunjiaLin
+linrunja@gmail.com fusion(IVIF)isanindispensablebranchincomputervision
+community. The generated fused results have been widely
+GuanyaoWu
+rollingplainko@gamil.com usedforthesubsequentapplications,includingobjectdetec-
+tion(Wongetal.,2017;Wangetal.,2023;Liuetal.,2023c),
+RishengLiu
+rsliu@dlut.edu.cn pedestrianre-identification(Duanetal.,2017),semanticseg-
+ZhongxuanLuo
+zxluo@dlut.edu.cn 2 KeyLaboratoryforUbiquitousNetworkandService
+SoftwareofLiaoningProvince,Dalian116620,China
+1 SchoolofSoftware,DalianUniversityofTechnology,Dalian
+116024,China 3 PengChengLaboratory,Shenzhen518000,China
+123\n--- PAGE 2 ---\nInternationalJournalofComputerVision(2024)132:1748–1775 1749
+sitatefurtherattention(showninFig.1).First,utilizingCNNs
+in the IVIF is challenging due to the lack of labeled fused
+imagesforsupervision.Existingapproachesattempttosolve
+itbydesigningvariouslossfunctionstopenalizedifferences
+between input and fused images, causing massive redun-
+dant information emerged to the fused result (Zhao et al.,
+2020a). Second, to fuse corresponding features from both
+Fig.1 Visualillustrationthathighlightstheexistingissuesininfrared sides,existingapproachesrelyonadjustingtrade-offparam-
+andvisibleimagefusion.Observethattheregionsmarkedbyyellow etersintheirlossfunctions.Thiscausesimbalancedfusion
+arrows signify redundant information, while those indicated by blue
+performanceandislabor-intensive(Li&Wu,2018;Zhang
+arrowsdenoteinformationdegradation.Forexample,DIDFuseisprone
+toretainingredundantinformation,asevidencedbythefrontwindshield etal.,2020a).Third,existinglearning-basedmethodsintro-
+oftheJeepandthesurroundinghalooflight.Ontheotherhand,MFEIF duceskipconnectionstoreducegradientdisappearanceand
+canresultinthelossofessentialinformationduringitsfusionprocess, featuredegradationduringthefusionprocess.However,the
+asexemplifiedbythereducedvisibilityofcloudsintheskyandthe
+fused results still suffer from vital information loss (Liu et
+obscuredindicatoronthepole(Colorfigureonline)
+al.,2021a).
+Inthispaper,toaddresstheissuesmentionedabove,we
+mentation(Puetal.,2018;Liuetal.,2023a,d),andmilitary proposeacoupledcontrastivelearningnetworkwithmulti-
+monitoring. level feature ensemble for fusing the infrared and visible
+Visiblesensorsimagebyreflectinglightstoprovidehigh images in an end-to-end manner, termed CoCoNet. First,
+spatial resolution background details. However, the targets wedevelopacoupledcontrastivelearningschemetoguide
+cannotbeseenclearlycausedbypoorlightingorcamouflage themodeltodistinguishsignificantcomplementaryfeatures,
+conditions.Incontrast,infraredsensorsimagebydiscrimina- i.e., distinct targets and textural details. This makes the
+tivethermalradiationemittedfromobjects,whichisimmune model capable of extracting and fusing only the desirable
+tochallengingconditionsandworkalldayandnight.There- features from each modality. Second, a measuring mech-
+fore,itisworthwhiletofusetheinfraredandvisibleimage anism is applied to compute the proportional importance
+intoasingleimagethatsimultaneouslyretainthevitalinfor- ofsourceimagesforgeneratingdata-drivenweights.After-
+mationforbothsides. ward,thesegeneratedweightsareappliedinourlossfunction
+In the past few years, a large number of approaches for to replace the manually-craft trade-off parameters. Under
+realizingIVIFhavebeenproposed.Accordingtotheircorre- this design, the model can generate the fused image with
+spondingadoptedtheories,thesemethodscanbedividedinto adaptation to specific source images. In addition, a multi-
+fivecategories,includingmulti-scaletransformbasedmeth- levelattentionmoduleisdesignedtolearnrichhierarchical
+ods (Li et al., 2013), sparse representation based methods feature representation and ensure these features have been
+(Zhang et al., 2013, 2018), subspace decomposition based fully utilized. Experiments demonstrate that CoCoNet can
+methods(Luetal.,2014),hybrid-basedmethods(Maetal., begeneralizedforfusingdifferenttypesofmedicalimages,
+2017; Liu et al., 2015), optimization model based methods e.g., magnetic resonance image (MRI) and single photon
+(Ma et al., 2016; Zhao et al., 2020) and others. Some of emissioncomputedtomography(SPECT)image,aimingto
+these methods are dedicated to designing various feature retain anatomical information from MRI image and func-
+transforms to learn better feature representation (Li et al., tionalinformationfromSPECTimagesimultaneously.Our
+2013; Yan et al., 2015). The others are attempt to discover contributionsarethree-fold:
+appropriatefusionrules(Maetal.,2017;Zhangetal.,2018).
+However, these methods rely on hand-craft ways and typi- • In light of the major cornerstone of IVIF, preserving
+callyhavetobetimeconsuming. complementaryinformationwhilesimultaneouslyelim-
+Recently,researchersintroducedconvolutionalneuralnet- inatingredundancyacrosstwomodalities,weintroduce
+works(CNNs)tothefieldofIVIF,withstate-of-the-artper- coupled contrastive constraints to achieve this goal and
+formance(Li&Wu,2018;Lietal.,2018a;Maetal.,2019b; seamlesslyintegrateitintothelossfunction.
+Xuetal.,2019).Generally,thedeeplearning-basedmethods • Weraiseadata-drivenmechanismtocalculatetheinfor-
+canbedividedintothreecategories,i.e.,auto-encoder-based mation retention degrees to boost intensity and detail
+methods (Li & Wu, 2018; Liu et al., 2021a; Zhao et al., consistencybetweenthesourceimagesandfusedresults.
+2020a),end-to-endCNN-basedmethods(Lietal.,2021;Xu This approach mitigates the need for labor-intensive
+etal.,2020;Zhangetal.,2020a)andgenerativeadversarial manual parameterization within the loss function and
+(Maetal.,2019b, 2020b)network-basedmethods. facilitatesadaptationtosourceimagecharacteristics.
+These existing learning-based methods have achieved • By designing a multi-level attention module (MAM),
+advancedperformance,butseveralunresolvedissuesneces- our network is able to learn rich hierarchical features
+123\n--- PAGE 3 ---\n1750 InternationalJournalofComputerVision(2024)132:1748–1775
+representationandeffectivelyavoidfeaturedegeneration The learned dictionary can sparsely represent the infrared
+duringthefusionprocess. and visible images, thus potentially enhancing the repre-
+sentation of the final fused results. For instance, Kim et al.
+Extensive qualitative and quantitative experiments on mul- (2016)proposedamethodthatwasbasedonpatchclustering,
+tiple datasets demonstrate the superiority of our method, which achieves appealing fusion performance and removes
+outperformingninestate-of-the-artIVIFmethodsbyalarge theredundancyofthelearneddictionary.
+margin.Besides,CoCoNetisabletobeextendedtomedical Saliency targets to calculate the significant pixel than
+imagesandachievessuperiorperformance. neighbours,which attractsvisualattentionunder abottom-
+up manner. To this end, researchers have adopted saliency
+methodstotheIVIFtask.Maetal.(2017)designedarolling
+2 RelatedWorks
+guided filter to decompose the source images into the base
+anddetaillayer.Thentheyusedthevisualsaliencymapand
+In this section, we briefly overview the traditional fusion weighted least square optimization to merge the base layer
+methodsanddeeplearning-basedones.Furthermore,theuti- anddetaillayer,respectively.
+lization of attention mechanism and contrastive learning in The core idea of subspace-based methods is to project
+deeplearningarealsogiveninfollowing. high-dimensionalsourceimagesintolow-dimensionalsub-
+spaces, which is easy to capture the intrinsic structures.
+2.1 Multi-modalityImageFusionMethods Principal Component Analysis (PCA) (Abdi & Williams,
+2010), Independent component analysis (ICA) (Hyvärinen
+2.1.1 InfraredandVisibleImageFusion &Oja,2000),andIntensity-Hue-Saturation(IHS)(Tuetal.,
+2004) are in this category. Bavirisetti (2017) used fourth-
+TraditionalFusionMethods orderpartialdifferentialequationstodecomposeimage,and
+In the past few decades, extensive traditional infrared and then merge the decomposed detail information by PCA.
+visible image fusion have been proposed and applied well. Thus,theabundantcanbetransferredtothefusionresults.
+Generally,accordingtotheircorrespondingadoptedtheories, Model-based methods also shed new light on IVIF (Ma
+allofthesetraditionalmethodscanbedividedintosixrepre- et al., 2016; Liu et al., 2021). Based on total variation, Ma
+sentativecategories,i.e.,multi-scaletransform(MST)-based etal.(2016)firstintroducedamethodforIVIF,whichkept
+methods (Li et al., 2013; Ma et al., 2017), spare represen- theintensityinformationofinfraredimagesandretainedthe
+tation (SR)-based methods (Cui et al., 2015; Zhang et al., detailedinformationofvisibleimagessimultaneously.More
+2018),saliency-basedmethods(Maetal.,2017),sub-space- recently, Liu et al. (2021) proposed a bilevel optimization-
+basedmethods,model-basedmethods(Zhaoetal.,2018;Liu based method to solve the IVIF and medical image fusion.
+etal.,2021;Zhaoetal.,2020),hybridmodelsandothermeth- Inaddition,thedata-drivenweightisemployedinthemodel
+ods(Gangapureetal.,2017). to replace the hand-craft parameters and further boost the
+MST are widely used in the field of IVIF, achieving fusionperformance.
+outstanding fusion performance. These MST-methods tar- TheaforementionedIVIFmethodsallhavetwosides,and
+get to design various transformation tools, e.g., wavelet itisworthwhiletocombinetheiradvantagestoimprovethe
+transform (Petrovic & Xydeas, 2004; Lewis et al., 2007), fusionperformance.Tothisend,Liuetal.(2015)introduced
+non-subsampled contourlet transform (Bhatnagar et al., aunifiedfusionframeworkbycombiningMSTandimproved
+2013), contourlet transform (Da Cunha et al., 2006), edge- SR;theMSTisemployedtodecomposethesourceimages,
+preserving filter based transform (Ma et al., 2017), and andtheSRisutilizedtoobtainfusioncoefficients.
+Retinex theory-based transform, to extract features at dif- Althoughthesetraditional-basedmethodsplaytheirroles
+ferent scales. Then these transformed features are merged to the IVIF task with achieving meaningful performance.
+by specific fusion rules. Finally, the fused results are pro- However, the hand-craft feature extractors and manually
+vided by reverse their adopted transforms. Li et al. (2013) designedfusionrulesmakethesetraditional-basedmethods
+appliedaguidedfilterindealingIVIFtask,whichprovides more and more complex, resulting in time-consuming and
+visual-pleasantfusedresultswithlessnoiseinterference.To limitedfusionperformanceforvariousscenes.
+preserve abundant details on the fused results, Meng et al.
+DeepLearning-BasedFusionMethods
+(2017)introducedanIVIFmethodwasbasedontheNSCT
+Deeplearningtechniquehasachievesignificantadvancesin
+andobjectregiondetection.
+tremendoustasks(Li&Wu,2018;Liuetal.,2021;Maetal.,
+DifferentfromMST-basedfusionmethodswithprefixed
+2019b;Liuetal.,2021a;Xuetal.,2020;Lietal.,2021;Ma
+basis functions, SR-based methods (Yin et al., 2017; Kim
+etal.,2020b;Zhaoetal.,2020a;Wangetal.,2022;Jianget
+et al., 2016; Zhang et al., 2018) targets to construct an
+al.,2022b,a;Liuetal.,2022a, 2021;Maetal.,2022c;Fanet
+over-completedictionaryfromhigh-qualitynaturalimages.
+123\n--- PAGE 4 ---\nInternationalJournalofComputerVision(2024)132:1748–1775 1751
+al.,2023;Liuetal.,2022c;Maetal.,2023, 2022b),duetoits and adjust the fusion rule to face the other types of fusion
+strongnon-linearfittingabilityfrommassivedata.EarlyIVIF tasks. Zhang and Ma (2021)introduced the idea of squeeze
+methodsonlyemployeddeeplearningforfeatureextraction anddecompositionintothefieldofimagefusion,combined
+or generating weight maps. For instance, Liu et al. (2021) gradientandintensityinformationtoconstructageneralloss
+adoptedtwopre-trainedCNNtogeneratetwoweightmaps function,andproposedageneralfusionnetwork.Torealize
+formergingthebaseanddetaillayer,respectively.However, multiple fusion tasks into a single model, Xu et al. (2020)
+the whole process is still under a traditional optimization came up with a novel fusion network, in which overcomes
+model,whichlimitsthefusionperformance. thestorageandcomputationissuesorcatastrophicforgetting
+Recently, a part of learning-based methods (Li & Wu, inthetrainingphase.
+2018; Liu et al., 2021a; Zhao et al., 2020a; Li et al., 2021; Recently,transformer(Vaswanietal.,2017a)hasreceived
+Zhao et al., 2023a) that utilizing auto-encoder architec- extensiveattentionsinceitwasproposedinthefieldofnatural
+ture have been proposed. The pre-trained auto-encoder are language processing. Later, Dosovitskiy et al. (2020) pro-
+employed to realize feature extraction and feature recon- posedtheVisionTransformer(ViT)forimageclassification.
+struction,inwhichthefusionrulesarefulfilledbymanually- Thissuccessfulexamplesinotherareasofcomputervision
+designed.LiandWu(2018)firstintroduceanauto-encoder haveinspiredtheextensivedevelopmentoftransformerbased
+networkforIVIF.Byintegratingadenseblockintheencoder methodsinthefieldofimagefusion.VSetal.(2021)tookthe
+part,thefeaturecanbeextractedcomprehensively.Thenthey leadinproposinganimagefusiontransformermodelthatcan
+usedadditionandl1-normruleinthefusionlayertogenerate simultaneously use local information and long-range infor-
+fusedresults.Considerthatvitalinformationoftendegener- mation,whichmakesupforthelackoftheabilityofCNN
+atesfromthenetwork,Liuetal.(2021a)employeddifferent modeltoextractglobalcontextinformation.Thetransformer
+receptiondilatedconvolutionstoextractfeaturefromamulti- moreeffectivelyfusescomplementaryinformationofdiffer-
+scaleprospective,andthenmergedtheseextractfeaturesby ent modalities. Ma et al. (2022) proposed a general fusion
+the edge attention mechanism. More recently, Zhao et al. method,itcanretainpixelsofsourcemodalitieswithmax-
+(2020a)proposedanauto-encoderbasedfusionnetwork,in imumintensity,whichactuallyintendstoretainforeground
+which the encoder decomposes an image into background targetsfromthethermalimageandbackgroundtexturesfrom
+and detail feature maps with low-/high-frequency informa- thevisibleimage,sincetheyareexactlyregionswithhigher
+tion,respectively.Thenthefusedresultisgeneratedbyvia pixel intensity in each modality. Besides, recent advances
+thedecoderpart. indiffusionmodelalsoprovidefreshperspectivesforIVIF
+Apartfromthat,extensivegenerativeadversarialnetwork (Zhaoetal.,2023b).
+(GAN)-based fusion methods (Ma et al., 2019b, 2020a,b)
+havebeenproposed,duetoitspowerfulunsuperviseddistri- 2.1.2 MedicalImageFusion
+butionestimationability.Forthefirsttime,Maetal.(2019b)
+established an adversarial game between the visible image SimilartoIVIF,theexistingtraditionalmethodsofMIFcan
+andfusedresulttoenhancethetexturaldetails.However,they be roughly classified into two types: multi-scale transform
+onlyusedtheinformationfromthevisibleimage,thuslosing basedandsparserepresentationbasedmedicalimagefusion.
+contrastorcontourofthetargetonthefusedresult.Toame- MSTisalsoacommonlyusedmeaninthefieldofmedical
+liorate this issue, they later introduce a dual discriminators imagefusion.ComparedwithMSTinIVIF,theirprocessing
+GAN (Ma et al., 2020a), in which both infrared and visi- flow are similar, but different in details (Li et al., 2023b).
+bleimagesareparticipateinthenetwork,thussignificantly In the medical field, the common multi-scale transforma-
+boost the fusion performance. As more attempts, Li et al. tionmethodsusuallyusedifferentwavelettotransformthe
+(2021)introducedanend-to-endGANmodelthatintegrates domain. Yang et al. (2008) used the contourlet domain for
+multi-classificationconstraints.Liuetal.(2022a)designeda medical image fusion, proposed a contrast measurement
+fusionnetworkwithonegeneratoranddualdiscriminators. method based on the characteristics of the contour wave to
+By introducing a salient mask in their discriminative pro- selectthepartsuitableforthehumanvisualsystem,andfur-
+cess,itcanpreservesstructuralinformationoftargetsfrom therimprovedthequalityofthefusedimagebycombining
+theinfraredandtexturaldetailsfromthevisible. variousfusionrules.
+Furthermore, a growing number of researchers concen- Inthefieldofsparserepresentationonmedicalimages,Liu
+trateondesigningthegeneralimagefusionnetwork(Zhang andWang(2015)proposedanadaptivesparserepresentation
+et al., 2020b,a; Xu et al., 2020; Lei et al., 2023; Li et al., model, which discards the redundant dictionary to learn a
+2022; Liu et al., 2022b; Li et al., 2023a; Liu et al., 2022). compactsubdictionary.Thesourceimageblockadaptively
+Zhangetal.(2020b)introduceaunifiedfusionnetworkfor selectsfeaturesfromthesubdictionarytoachievetheeffect
+realizingvariousimagefusiontaskswithhighefficiency.The ofdiminishingcomputingcostsandeffectivelyreducingarti-
+networkonlyrequirestrainingononetypeoffusiondataset, facts. Liu et al. (2019) integrated morphological principal
+123\n--- PAGE 5 ---\n1752 InternationalJournalofComputerVision(2024)132:1748–1775
+high-level and low-level vision tasks (He et al., 2020; Wu
+etal.,2021;Xieetal.,2021a),e.g.,objectdetection(Xieet
+al.,2021a),imagedehazing(Wuetal.,2021),imagesuper-
+resolution (Zhang et al., 2021a) and multi-exposure image
+fusion (Liu et al., 2023), achieving SOTA performance. In
+thisstudy,weshowthatcontrastivelearningcanbeemployed
+tolearnrepresentationsofsalienttargetsandtexturaldetails
+Fig.2 TypicalexamplesofsalientmaskMinTNOdataset
+foreffectivefusion.
+componentanalysisandconvolutionalsparserepresentation
+into a unified optimization framework, and realized stable
+3 TheProposedMethod
+visualizationeffect.
+With the extensive application of deep learning in other
+Inthissection,wefirstdescribethemotivationofCoCoNet,
+image fusion fields (Liu et al., 2022), some general fusion
+then introduce the designed loss function, i.e., coupled
+frameworks(Zhang&Ma,2021;Maetal.,2022;Xuetal.,
+contrastiveconstraintandself-adaptivelearningloss.After-
+2020) also integrate medical image fusion as their branch
+wards,detailednetworkarchitectureandmulti-levelfeature
+tasks.XuandMa(2021)proposedanunsupervisedenhanced
+ensemblemodulearepresented.Finally,wedescribedetails
+medical image fusion network to retain both surface and
+forextendingCoCoNettomedicalimagefusion.
+deep-levelconstraintsinformation.
+2.2 AttentionMechanisminDeeplearning
+3.1 Motivation
+TheattentionmechanismdrivesfromNaturalLanguagePro-
+WeconsiderthegoalofIVIFaspreservingcomplementary
+cessing(NLP)(Parikhetal.,2016)andhasbeensuccessfully
+informationwhileremovingredundancyfromtwomodalities
+appliedinCNN-basedcomputervisiontasks(Huangetal.,
+(Maetal.,2022;Liuetal.,2022a).However,nosupervision
+2019;Vaswanietal.,2017b),e.g.,saliencyobjectdetection
+signalsexistasexplicitguidancefortheIVIFtask.Toaddress
+(Zhang et al., 2021), semantic segmentation (Huang et al.,
+thisissue,existingworkdesignsonlystructureorpixel-level
+2019;Lietal.,2019),imageenhancement(Lvetal.,2019)
+terms in the loss function, which does not ensure that the
+and image restoration (Zhang et al., 2019). The attention
+modelisoptimizedbyvalidfeatures,e.g.,blurrytexturesin
+mechanismisexplainedbythehumanbiologicalvisualsys-
+most infrared images or dark targets in the visible images
+tem that allow human to capture ROI (region of interest)
+should not be the valid supervision signal. Consequently,
+informationandignoreotherunimportantonesmoreeasier.
+targets/details of the fused result often contain unpleasant
+To explore salient information in both foreground and
+artifacts. In this study, we argue that there is intrinsic fea-
+backgroundregions,Zhangetal.(2021)introducedaBilat-
+ture guidance in the source image pair, i.e., salient thermal
+eral Attention Network (BiANet) for the RGB-D saliency
+targetsintheinfraredandabundanttexturaldetailsinthevis-
+object detection task, in which complementary attention
+ible.Withmanualpriorinvolved,wedesigntwolossterms
+mechanismcancoordinaterefinetheuncertaindetailsbetween
+basedoncontrastivelearningtoimposeexplicitconstraints
+fore-/backgroundregions.Liuetal.(2021b)proposedahier-
+forprominenttargetsandvividtextures.Besides,mostfusion
+archical attention-guided module for multi-exposure image
+methods use skip connections to avoid information loss in
+fusion,whichallowsthenetworkcancapturethemostimpor-
+the fusion process. However, these direct skip connections
+tantinformationinextremelyexposureregions.
+may also introduce unfiltered information, bringing noises
+tothefusedimage.Moreover,hand-craftedtrade-offhyper-
+2.3 ContrastiveLearning parametersinthelossfunctionareusuallydifficulttoadjust,
+posinglatentthreatstothemodel’sflexibilitytospecificdata.
+ContrastiveLearninghasobtainedcomprehensiveattention Therefore, we introduce a coupled contrastive learning
+intheself-supervisedlearningarea(Heetal.,2020;Henaff, network to alleviate these issues. By elaborating the con-
+2020).Comparedwithothertechniquesthatemployafixed structed coupled contrastive constraints with self-adaptive
+target, contrastive learning aims to maximize mutual infor- weights in the loss function, we are capable of fusing the
+mation by employing positive and negative samples. More mostsignificantinformationandautomaticallydetermining
+precisely, the learned model needs to pull the anchor close their individual weights in the loss function. A multi-level
+to positive samples while pushing it far away from nega- attention module is also incorporated to learn comprehen-
+tiveones.Previousworkappliescontrastivelearningtoboth sivefeaturerepresentation.
+123\n--- PAGE 6 ---\nInternationalJournalofComputerVision(2024)132:1748–1775 1753
+Fig.3 OverallarchitectureofCoCoNet
+3.2TheProposedCoCoNet abletoextractandfusethemfrombothvisibleandthermal
+sensors.
+3.2.1 CoupledContrastiveLearning Tothisend,thepositiveandnegativesamplesforimprov-
+ingforegroundsaliency,termedastargetconstraint,should
+Inspired by previous work on contrastive learning, we pro- be I (cid:2)M and I (cid:2)M. For the latent feature space, we
+R V
+pose a coupled contrastive regularization for IVIF, based selectthecommonlyusedVGG-19(Simonyan&Zisserman,
+on two pairs of constraints,i.e.,target constraint and detail 2014),denotedasG,withpre-trainedweights.Weformulate
+constraint. Differentfromsupervised learning with explicit thelossfunctionofthisgoalasfollows:
+guidanceofreferenceimages,therearenoclearindicationsof
+positiveandnegativesamplesforinfraredandvisibleimage
+fusion.Hence,thecoreofapplyingcontrastivelearninglies (cid:2)N (cid:3)μ −μ + (cid:3)
+L = w (cid:3) i i 1 , (1)
+indetermininghowtoconstructpositiveandnegativepairs. ir i M (cid:3)μ −μm− (cid:3)
+i=1 m i i 1
+Inthispaper,wearguethatthedesirablefeaturesservedas
+positiveandnegativesamplesareincludedinsourceimages.
+Concretely,foraninfraredimage,itsforegroundsalientther- whereN andM arethenumberofVGGlayersandnegative
+mal target is of more interest compared to the rest parts. samples for each positive sample, respectively. μ denotes
+i
+Similarly,inavisibleimage,thebackground vividtextural theforegroundfeatureofthefusedimage,whichisdefined
+detailsareofhigherdemandcomparedtoitsdarkforeground asG (I (cid:2)M).μ+ andμm− arethepositiveandnegative
+i F i i
+part.Weutilizethispriortoconstructcontrastivepairssothat samples,formulatedasμ+ =G (I (cid:2)M),μm− =G (Im(cid:2)
+i i R i i V
+our modelcanlearntodistinguishsalienttargetswithhigh M),respectively.m meansthemthnegativesample.(cid:3) · (cid:3)
+1
+pixelintensitiesandbackgroundtextualdetails.Finally,our denotesthe(cid:2)1norm.
+modelbecomesawareoftypicalfeaturesfromsourceimages, Likewise,forthebackgroundpart,wehopetoretainmore
+achievingcomplementaryfusion. vividdetailsfromvisibleimages,treatingbackgroundofthe
+Wetargettoachievetwoobjectivesbasedontwogroupsof infraredimageasnegativesamples,whilethevisibleimage
+constraintsforafusedresult:toimprovethesaliencyoffore- backgroundaspositivesamples.Therefore,theobjectfunc-
+groundobjects,thecorrespondingtargetsfromtheinfrared tionfordetailconstraintcanbegivenas:
+imageareutilizedaspositivesampleswhilethecorrespond-
+ing regions from the visible image are utilized as negative
+samples. Meanwhile, we set the visible image as positive (cid:2)N (cid:3)ν −ν + (cid:3)
+whiletheinfraredimageasnegativesampleswhenweneed L vis = w i (cid:3) M (cid:3) i ν − i ν m− 1 (cid:3) , (2)
+topreserveclearbackgrounddetailsinthefusedresult. i=1 m i i 1
+Inordertointroduceartificialpriortomaximizetheabove
+objectives, we manually generated masks for correspond- whereν denotesthebackgroundfeatureofthefusedimage,
+i
+ingimagepairsbasedontypicalinfraredimagescapturedin whichisdefinedasG (I (cid:2)M).ν+ andνm− aretheposi-
+TNO dataset. As shown in Fig.2, let M denote the salient tiveandnegativesamp i les F ,formulate i dasν+ i =G (Im(cid:2)M),
+mask of foreground and M represents the salient mask of νm− = G (I (cid:2)M),respectively.m me i ansthe i m V thnega-
+background(M = 1−M).Thisexplicitguidanceforces
+ti
+i
+vesample
+i
+.I
+R
+llustrationofthecontrastivelearningprocessis
+themodeltodistinguishsaliencyandtexturaldetails,andbe providedinFig.3.
+123\n--- PAGE 7 ---\n1754 InternationalJournalofComputerVision(2024)132:1748–1775
+3.2.2 Self-adaptiveLearningWeight larity.Thus,σ canbedeterminedbythefollowingequation:
+Image fusion targets to provide an information-abundant e
+G(IV )
+e
+G(IR )
+σa,σb = , , (7)
+imagewithsufficientdetailsandbalancedintensitiesbycom- eG(IV )+eG(IR ) eG(IV )+eG(IR )
+biningfavorablefeaturesofsourceimages.Fortheinfrared
+andvisiblefusiontask,welearntominimizethesimilarity Foranother,tofuseimageswithhighcontrast,imageEntropy
+ofsourceimagesandthefusedimage.Thelossfunctionis (EN)isemployedtoupdateweightparameterγ oftheMSE
+mainly composed of two parts, i.e., the structure similarity loss.ENisformulatedasfollows:
+lossandtheintensitysimilarityloss,whichcanbedefineas:
+L(cid:2)−1
+EN=E(I )=− p log p , (8)
+F x 2 x
+L P =αL S +L N , (3) x=0
+whereαisatuningparameter,L S andL N denotestructure where L denotes the grey level of a given image, p x is the
+similaritylossandintensitysimilarityloss.L S ismeasured probabilitythatapixelliesinthecorrespondinggreylevel.As
+Eq.8suggests,ENmeasurestheamountofinformationofan
+by the structure similarity index measure (SSIM) (Wang et
+imageandiscomputedinpixellevel,itiscloselycorrelated
+al.,2004),whichiswidelyusedtoindicatethedifferenceof
+totheMSEconstraint,whichisalsoapixel-levelconstraint.
+imagesbasedonsimilaritiesofcontrast,light,andstructure.
+Hence,themodalitywithahigherEN(i.e.,moreinformation)
+Itisgivenasfollows:
+should deserve a higher wight for maximizing meaningful
+features.Therefore,theγ canbeupdatedwiththefollowing
+L S =σa(1−S(I V ,I F ))+σb(1−S(I R ,I F )), (4) rule:
+whereS(·)denotesSSIMvalue.
+γa,γb =
+e
+E(IV )
+,
+e
+E(IR )
+, (9)
+L N isadoptedtostrengthentheconstraintsonthediffer- eE(IV )+eE(IR ) eE(IV )+eE(IR )
+encesofintensitydistributions,formulatedas:
+Consequently, combining all the restrictions above, we
+givethefollowinglossfunctiontoguidethelearningprocess:
+L N =γa (cid:3)I V −I F (cid:3) 2 +γb (cid:3)I R −I F (cid:3) 2 , (5)
+L total =L P +L ir +L vis , (10)
+where(cid:3)·(cid:3) isMeanSquareError(MSE).
+2
+InEq.4andEq.5,σ andγ aretwopairsofproportional whereL P istheself-adaptiveloss,L ir andL vis arethetwo
+weightsthatbalancetheproportionofthevisibleimageand pairsofcontrastivelossrespectively.
+infraredimage.σ andγ consistsof{σa,σb}and{γa,γb},
+respectively.Theyareempiricallysettofixedvaluesinexist- 3.3 NetworkArchitecture
+ingmethods(Zhangetal.,2020a).However,afixedmanneris
+insufficienttofullyexploitthesourceimagefeatures.There- AsshowninFig.3,each convolution block consistsoftwo
+fore, we design a self-adaptive loss to consider the data groupsof3×3convolutionallayersfollowedbybatchnor-
+characteristics by optimizing the image-specific weights σ malization and LeakyRuLU. The feature maps from each
+andγ.
+depthlayerscanberepresentedas: f , f , f , f from
+U0 U1 U2 U3
+Foronething,weexpectthefusedimagetoretainsignifi- layers with 32, 64, 128, 256 channels respectively. For the
+canttextures(e.g.,structuralinformation).AverageGradient multi-level attention module, we select two VGG-19 with
+(AG)isappliedtooptimizetheweightparameterσ ofSSIM pre-trained weights as our backbone. It takes the visible
+loss.TheequationofAGisgivenas: image and infrared image as inputs in a separate manner,
+as an attempt to make full use of high level features of the
+(cid:4) (cid:5)
+1 sourceimage.Infraredfeaturesobtainedfromthebackbone
+AG=G(I
+F
+)=
+HW
+(cid:3)∇
+h
+I
+F
+(cid:3)
+1
++(cid:3)∇ vI
+F
+(cid:3)
+1
+, (6)
+aredenotedas f R1 , f R2 , f R3 ,whichcomefromlayersof64,
+128 and 256 channels, respectively. Likewise, visible fea-
+wherethe∇
+h
+I
+F
+and∇ vI
+F
+representthefirst-orderdifferen- tures extracted from the backbone are represented as f
+V1
+,
+tialofthefusedimagefromhorizontalandverticaldirection, f , f fromthecorrespondinglayers.
+V2 V3
+respectively. H and W are the height and width. (cid:3) · (cid:3) Toemploymorehigh-levelfeaturesintothefusedimage,
+1
+denotes(cid:2)1norm.SinceAGreflectsthebasicintensitychange weproposeamulti-levelattentionmodule(MAM)toachieve
+ofanimage,itisconsideredtowellmatchthegoalofSSIM comprehensivefeaturerepresentationfromthesourceimages.
+loss, i.e., to constrain the fused image from structure simi- Meanwhile,weexpectthisattentiontointensifytheextracted
+123\n--- PAGE 8 ---\nInternationalJournalofComputerVision(2024)132:1748–1775 1755
+3.4.1 MedicalImageFusionBackground
+Withtherapiddevelopmentofclinicalrequirement,aseries
+of medical imaging technologies, e.g., X-ray, computed
+tomography (CT), MRI, PET and SPECT, has been intro-
+duced in the past few decades. However, each imaging
+technologyhasitsadvantagesandlimitations.Forinstance,
+X-ray is an electromagnetic wave with extremely high fre-
+quency,shortwavelength,andhighenergy,whichhasstrong
+penetrability.Ithasbeenwidelyusedinfluoroscopybefore
+diagnosisorsurgery.ComparedwiththeconventionalX-ray
+photography,CTcanprovidedetecttheslightdifferenceof
+Fig.4 Architectureofchannelattention the bone density with high resolution, but it has limitation
+inrepresentingtissuecharacterization.Apartfromthat,MRI
+cannotonlydisplaythemorphologicalstructureoftheorga-
+features by a global enhancement. Based on the obtained nizationalorgans,butalsodisplaythefunctionalconditions
+features f U , f R and f V above, a channel attention is first and biochemical information of certain organs. However,
+performed: MRIlacksofthedescriptionofthesofttissueactivity.Incon-
+trast, both PET and SPECT are functional imaging, which
+present the difference in the intensity of the human tissue
+fC =CA(f ), fC =CA(f ), fC =CA(f ), (11)
+U U R R V V activity according to the difference in the concentration of
+theaggregation.Evidently,eachimagingmodalityunavoid-
+ablyhasitsrespectedcharacteristicsandinherentdrawbacks.
+whereCAdenoteschannelattention,whichwillbedescribed
+It is worthwhile to combine the advantages from different
+inthefollowingpart.Tofusethesefeatures,weapplycon-
+modalityimagesandthenprovideaninformativeandcom-
+volutionoperationsforeachgroupoffeatures:
+plementaryfusedimagefortheclinicaldiagnosis.
+Inrecentyears,aseriesofhybridimagingtechnologies,
+fA =Conv(Concate(fC , fC , fC ))... e.g.,CT-MRI,MRI-PETandMRI-SPECT,havebeenintro-
+1 U1 R1 V1
+(12) duced in our daily life. In this paper, we take two typical
+fA =Conv(Concate(fC , fC , fC )),
+n Un Rn Vn medicalimagefusion,i.e.,MRI-PETandMRI-SPECTasan
+example and apply CoCoNet to solve this issue. As men-
+whereConvrepresentsaconvolutionlayerwith3×3kernels, tioned above, both PET and SPECT images can provide
+andConcatemeansconcatenation. functionalandmetabolicinformation,whicharewidelyused
+Thedetailedarchitectureofchannelattentionisillustrated foranalyzingthefunctionsormetabolicconditionsofeach
+in Fig.4. Given a feature f of dimension RC×H×W, we organs. These obtained images are rich in color but lack
+first use a convolution layer to generate three components in resolution. In contrast, MRI image can better portray
+P(f),Q(f),H(f),andreshapeP(f),Q(f)fromRC×H×W soft tissue structures in organs. Usually, it has high spatial
+toRC×HW,obtainingM ,M .Thenamatrixmultiplication resolution. Therefore, by integrating advantages from each
+P Q
+isappliedonM andthetransposeofM followedbyasoft- modalityimage,wecanobtaincomplementaryandcompre-
+P Q
+maxlayertocomputetheattentionfeaturemapM∈RC×C. hensiveinformationinasingleimage.
+Thereafter,amatrixmultiplicationisperformedbetweenthe Inmostofcases,asshowninFig.5a,bothPETandSPECT
+transposeofH(f)andM.Theresultisfinallyreshapedand areshowninpseudo-color,inwhichthecolorarerepresented
+addedbacktothesourceimageH . as functional information. For the fused image, the color
+f
+informationshouldinlinewiththePETorSPECTimages.
+To this end, we decouple the PET and SPECT image into
+3.4 ExtensiontoMedicalImageFusion YCbCrcolorspacewiththreechannels.Then,weemployY
+channel(theluminancechannelshowninFig.5b)tofusewith
+Inthissection,weextendourCoCoNettofusethemedical theMRIimagePETandSPECTusetheintensityinforma-
+images,e.g.,MRIandPETimagefusion,MRIandSPECT tionofYchanneltorepresentthefeaturedistribution,which
+image fusion. The PET and SPECT images are regarded issimilartotheinfraredimage,whileMRIimageshownin
+as pseudo-color images. We first transform them to color Fig.5chasrichtextureorganizationdetails,whichissimilar
+images,andthenapplyCoCoNettofusetheMRIimageand tothevisibleimage.Therefore,MIFandIVIFhavesimilar
+intensitycomponentofPETandSPECTimage,respectively. taskobjectives,thatis,toreducespatialdetaildistortionand
+123\n--- PAGE 9 ---\n1756 InternationalJournalofComputerVision(2024)132:1748–1775
+Fig.6 Typicalexamplesofmasksformedicalimagefusiontask
+Fig.5 SchematicillustrationofMIFtasks,where(a)pet/spectimage,
+bLuminance(Y)channelofpet/spectimage,cmriimage,dLuminance imagefollowingtheresearchofLiandChi(2005),denoted
+channel(Y)offusedimage,efusedimage asM =M,asshowninFig.6.Weexpectthefusedimageto
+m
+resembletheMRIsequenceunderregionsmaskedbyM ,
+m
+color intensity distortion of fused images and correspond-
+forreservingsofttissuetextures.Atthesametime,according
+ingmodalities.Aftergettingthefusedimage(Fig.5d)byY
+tocontrastivelearning,thefunctionalsequenceinthesame
+channelandMRIimages,othertwochannels areremained
+regionservesasnegative samples,whichaidtostressMRI
+unchanged to recover the color information, as shown in
+features.Thisprocesscanbedescribedasfollows:
+Fig.5e.
+(cid:2)N (cid:3)μ −μ + (cid:3)
+3.4.2 CoCoNetforMedicalImageFusion L = w (cid:3) i i 1 , (13)
+mri i M (cid:3)μ −μm− (cid:3)
+i=1 m i i 1
+Building on the unique characteristics of MRI sequence
+andfunctionalsequences(i.e.,PETandSPECT)mentioned whereN andM arethenumberofVGGlayersandnegative
+above, we can also apply the proposed coupled contrastive samplesforeachpositivesample,respectively.μ i denotesthe
+learningtointegratedesirablefeaturesfromdifferentmedi- MRI structure feature of the fused image, which is defined
+calmodalities.Weshouldfirstdefinefeaturesofinterestin asG i (I F (cid:2)M m ).μ i + andμ i m− arethepositiveandnegative
+MRI and functional (i.e., PET/SPECT) modalities respec- samples, formulated as μ i + = G i (I MRI (cid:2) M m ), μ i m− =
+tively.MRIsequencesarerichinsofttissuestructure,which G i (Im Fun (cid:2)M m ),respectively.Superscriptmmeansthemth
+providesclearindicationsofthebrainskeleton.Ontheother
+negativesample.(cid:3)·(cid:3)
+1
+denotesthe(cid:2)1norm.
+hand,Tobetterretainsalientstructureinformationfromthe Onthecontrary,thefunctionalsequencecanprovideabun-
+MRIimage,andsimultaneouslyfusefunctionalinformation dantintensityinformationofthesubject’sfunctionalactivi-
+whichreflectsmetabolicactivityoforgansortissues,aswell ties,e.g.,bloodflow.Toretainmostfavorablefeaturesfrom
+asthefunctionanddistributionofreceptors.Therefore,we functional sequences, we first reverse the MRI-segmented
+are able to clarify the useful features from two modalities maskM m togetM f =1-M m .ThenM f isimposedon
+assalientstructureinformationfromtheMRIsequence,and a functional sequence to extract most informative features,
+functionalindicationsfromthefunctionalsequence.Specifi- whichincludemetabolicinformationofasubject.Regionsof
+cally,tocombineusefulfeaturesfrombothsides,wepropose thefusedimageundermaskM f shouldbeconsistentwith
+toimposeaMRI-segmentedmaskanditsreverseversionon the functional image, while less similar to the MRI image.
+theMRIsequenceandfunctionalsequence,respectively,for Thiswholeprocesscanbemodeledusingatwincontrastive
+a better constraint on the features we aim to extract. For a learning-basedlossfunctiongivenasfollows:
+fusedimage,wehopeitssalientregionstoresemblethecor-
+responded MRI image, but less similar to the same region L = (cid:2)N w (cid:3) (cid:3)ν i −ν i + (cid:3) 1 , (14)
+fromitsfunctionalcounterpart.Inthesamevein,weexpect fun i M (cid:3)ν −ν m− (cid:3)
+i=1 m i i 1
+theotherregionsinthefusedimagetobeclosertothefunc-
+tionalsequence,butfurtherfromtheMRIcounterpartinthe whereν denotesthefunctionalfeaturesofthefusedimage,
+i
+latent feature space. In fact, a common problem for fusing whichisdefinedasG (I (cid:2)M ).ν+ andνm− arethepos-
+i F f i i
+MRI and functional sequences is that the texture details in itiveandnegativesamples,formulatedasν+ = G (I (cid:2)
+i i Fun
+MRIstendtogetcovered,thusweakened,afterfusingwith M ),νm− =G (Im (cid:2)M ),respectively.Superscriptm
+f i i MRI f
+its functional counterpart. To partially alleviate this issue, meansthemthnegativesample.
+oursalientmasksarefirstgeneratedbysegmentingtheMRI
+123\n--- PAGE 10 ---\nInternationalJournalofComputerVision(2024)132:1748–1775 1757
+4 Experiments
+Algorithm1Two-stageTraining
+Require: Sourceimages{x,y},contrastivelossL{ir,vis},self-adaptive
+4.1 ExperimentalSettings lossL P andothernecessaryhyper-parameters.
+Output: Optimalparameterω∗.
+1: whilenotconvergedo
+4.1.1 Datasets
+2: %Trainwithoutcontrastiveloss
+3: forNiterationsdo
+The infrared and visible image pairs we utilize to evaluate 4: %Determineself-adaptivefactors
+ourmethodarecollectedfromtheTNO1andtheRoadScene 5: σa,b,γa,b←G(x,y),E(x,y)
+6: %Computeself-adaptiveloss
+(Xu et al., 2020), which are publicly available. The above 7: L P ← L S (x,y,N(x,y;ω);σa,σb) +
+mentioneddatasetsareclarifiedbelow. L N (x,y,N(x,y;ω);γa,γb)
+TNOdatasetTheTNOisawidelyuseddatasetforinfrared 8: %Updatetrainableparameters
+andvisibleimagefusion.WeadoptTNOasthebenchmarkto 9: ω←ω−∇ ωL P
+10: endfor
+trainournetworkforitshighqualityimageswithdistinctive
+11: %Finetunebyaddingconstrastiveloss
+scenarios. 12: forMiterationsdo
+RoadScenedatasetTheRoadSceneincludesrealisticdriv- 13: σa,b,γa,b←G(x,y),E(x,y)
+ingscenes(e.g.,vehicles,pedestriansandroadsymbolsigns). 14: L P ← L S (x,y,N(x,y;ω);σa,σb) +
+L
+N
+(x,y,N(x,y;ω);γa,γb)
+It contains 221 representative image pairs with no uniform 15: ω←ω−∇ ω (L P +L ir +Lvis )
+resolution,collectedfromauthenticdrivingvideos. 16: endfor
+17: endwhile
+4.1.2 TrainingDetails
+as that in the first phase. The tuning parameter α is set to
+Our entire fusion framework is trained on the TNO dataset
+an empirical value of 20. The visual illustration of fusion
+through two phases: training and fine-tuning. The overall
+performanceovertrainingepochisgiveninFig.7.
+trainingstrategycanbefoundinAlgorithm1.
+Likewise, to train our model for medical imaging, two
+Inthetrainingstage,onlytheself-adaptivelossisapplied
+stages are required: training and fine-tuning. 2662 PET
+to update the network parameters (i.e., the contrastive con-
+patches and 4114 SPECT patch images are selected from
+straints are not involved in this phase). Concretely, the
+self-adaptive factors
+σa,b
+and
+γa,b
+are first computed by
+Atlas2 dataset.Allimages arecropped tosize64×64 and
+normalizedto[-1,1]astrainingset.WeselectAdamasthe
+measuringtheaveragegradientandentropyofanimagepair,
+optimizer and learning rate is set to 0.0001 in both stages.
+notethatthiswillnotaffectnetworkparameters.Thereafter,
+Inthetrainingstage,themodelistrainedfor3epochswith
+the network is penalized by the self-adaptive loss. As for
+batchsizeof30.Inthefinetuningstage,themodelistrained
+data pre-processing and other hyper-parameters, we select
+for1epochwithbatchsizeof10.Theself-adaptivelossand
+46 pairs of images and convert them to greyscale ones. To
+contrastive loss settings are the same as the IVIF task. The
+makefulluseofthegradientandentropyofeachimagefor
+self-adaptivetrainingloss,1410imagepatchesofsize64×64
+tuningparameterαissetto20.
+werecroppedfromsourceimages,thisenablesthenetwork
+to better perceive subtle gradients and entropy. Then, the 4.1.3 EvaluationMetrics
+training patches are normalized to [-1, 1] and fed into our
+network.TheAdamwasselectedasoptimizerandthelearn- Toquantitativelyevaluatethefusionperformance,inthislet-
+ingratewassetto0.0001withthebatchsizeof30. ter,weselectsixcommonlyusedmetricsforimagequality
+In the fine-tuning phase, both self-adaptive loss and the measurement,includingEN(Robertsetal.,2008),AG(Eski-
+contrastive constraints participate in updating the network cioglu&Fisher,1995),SF(Eskicioglu&Fisher,1995),SD
+weights, as shown in Algorithm 1. Data used in this step (Aslantas&Bendes,2015),SCD(Maetal.,2019a)andVIF
+include merely 18 images with salient masks from TNO. (Hanetal.,2013).Theirdetailsaregivenasfollows.
+As in the previous stage, 1410 images of size 64×64 are Entropy (EN) EN measures the abundance of information
+cropped.Forthecontrastiveconstraintloss,weuseonepos- includedinanimage,alargervalueindicatesthatthefusion
+itivesamplewiththreenegativesamples(onecorresponded strategyperformsbetter.TheformulationisgivenasEq.8.
+withthepositivepatchandtworandomlyselectedfromother Averagegradient(AG)AGmeasuresthegradientinforma-
+negativepatches).Thenetworkisupdatedfor5epochs,the tionofthefusedimage,whichcanreflectthedetailsofthe
+optimizer,learningrateandbatchsizesettingsarethesame fusedimage.TheformulationisgivenasEq.6.
+1 https://figshare.com/articles/TNO_Image_Fusion_Dataset/
+1008029. 2 http://www.med.harvard.edu/aanlib.
+123\n--- PAGE 11 ---\n1758 InternationalJournalofComputerVision(2024)132:1748–1775
+Fig.7 VisualillustrationoftrainingepochsincrementallyontheTNOdataset.Itisimportanttonotethatduringthefine-tuningphase,thecontrastive
+constraintsexhibitarobustcapabilityinrecoveringdistinctforegroundthermaltargetsandmaintainingabundantbackgrounddetails
+Spatial frequency (SF) SF is a criterion that reflects the betweenthesourceimageandthedifferenceimagerespec-
+changeofgraylevelinanimage.AnimagewithahigherSF tively.SCDisdefinedasfollows:
+valuepossessesmoretexturaldetails.Itisobtainedbasedon (cid:4) (cid:5) (cid:4) (cid:5)
+horizontalandverticalgradientinformation.Themathemat- SCD =r I V ,D V,F +r I R ,D R,F . (20)
+icalexpressioncanbedescribedasfollows:
+Visualinformationfidelityforfusion(VIF)VIFevaluates
+(cid:6)
+imagequalitybasedonitsfidelity,whichdetermineswhether
+SF= H2+V2 (15)
+animageisvisually-friendly.Itassessestheamountofvalid
+informationfusedfromthesourceimage.Alargervalueindi-
+where H andV are:
+catesbetterquality.VIFisdefinedasfollows:
+(cid:7)
+(cid:8) (cid:3)
+H = (cid:8) (cid:9) M 1 N (cid:2) i= M 1 (cid:2) j= N 2 |I F (i, j)−I F (i, j −1)|2 (16) VIF(I V ,I R ,I F )= (cid:2) k p k (cid:3) b b F F V V I I N D D s, s b ,b ( ( I V I V , , I R I R , , I F I F ) )
+(cid:7)
+(cid:8) (21)
+(cid:8) (cid:2)M (cid:2)N
+V =(cid:9) 1 |I (i, j)−I (i −1, j)|2 (17)
+MN
+i=2 j=1
+F F whereFVID s,b isthefusionvisualinformationwithdistor-
+tion,and FVIND s,b denotesthefusionvisualinformation
+withoutdistortion,inthebthblock,sthsub-band.
+where M and N are the width and height of the estimated
+image.
+4.2 ResultsandAnalysisonIVIF
+Standarddeviation(SD)SDisutilizedtomeasurewhether
+an image has abundant information and high contrast. A Qualitative Comparisons on TNO In Fig.8, we compare
+larger SD value suggests more characteristics included in ourCoCoNetwithseveralSOTAmethods:DenseFuse(Li&
+animage.Itisgivenasfollows: Wu,2018),FusionGAN(Maetal.,2019b),PMGI(Zhanget
+al., 2020a), DIDFuse (Zhao et al., 2020a), GANMcC (Ma
+(cid:2)M (cid:2)N et al., 2020b), RFN (Li et al., 2021), MFEIF (Liu et al.,
+1
+SD = |I (i, j)−μ|2 (18) 2021a),U2Fusion(Xuetal.,2020),SwinFusion(Maetal.,
+F
+MN
+i=1 j=1 2022),SDNet(Zhang&Ma,2021),SMoA(Liuetal.,2021)
+and TarDAL (Liu et al., 2022a) on samples from the TNO
+whereμistheaveragepixelvalue, M and N arethewidth dataset.Owingtotheproposedcontrastivelearning,overall,
+andheightoftheestimatedimage. ourresultsrenderhighercontrastandtheforegroundtargets
+aremuchbrighter(e.g.,trees,leaves,andforegroundobjects
+The sum of the correlations of differences(SCD) SCD is
+anindexbasedonimagecorrelation.First,thedefinitionof framedbytheredandgreenboxes).Asindicatedinthefirst
+correlation about source image I X and fused image I F is picture,thesalientobject(boxedbyaredframe)issharper
+givenasfollows:
+andclearer,thankstotheinfraredcontrastandsemanticfea-
+tures extracted from multi-level attention. DenseFuse and
+(cid:3) (cid:3)
+r(IX ,IF )= (cid:10) (cid:3) (cid:3) i M =1 N j=1 (IX (i,j) (cid:11) − (cid:3) IX )(I (cid:3) F (i,j)−IF ) (cid:12) D im ID ag F e u s s a e r c e an no a t ls b o ri g g i h ve t c e l n e o a u r g th h e t r h m u a s l c fe a a u t s u in re g s, d h e o g w ra e d v a e t r i , o t n he o ir f
+i
+M
+=1
+N
+j=1
+(IX (i,j)−IX )2
+i
+M
+=1
+N
+j=1
+(IF (i,j)−IF )2
+thefinalvisualeffects.FusionGANandRFNfailtoprovide
+(19)
+clear targets (the human in their results appear blurry). On
+theotherhand,wecanretainvividtexturaldetailsfromthe
+The difference between the fused image and the source visibleimageaswell.Asdisplayedinthesecondcompared
+imagesasD V,F andD R,F ,whichcorrespondthecorrelation picture,theredboxshowcasesabundantandcleardetailsof
+123\n--- PAGE 12 ---\nInternationalJournalofComputerVision(2024)132:1748–1775 1759
+Fig.8 Visualcomparison
+betweendifferentmethodson
+TNOdataset.Ourmethodis
+betterinpreservingdetailed
+texturaldetailsanddistinctive
+thermaltarget,especiallyinthe
+zoomed-inpatches
+Fig.9 Visualcomparison
+betweendifferentmethodson
+Roadscenedataset.Ourmethod
+hasadvantageinretainingthe
+mostinformation,e.g.,the
+pedestriansinthepatches.Best
+viewedonscreen
+theleaves,whileFusionGAN,DIDFuseandSMoAprovide formance in terms of vivid structure details. In the second
+nearlynodetailedtextures.Fromacomprehensiveview,the comparedpicture,onecanseethatthetruckindicatedbythe
+proposedmethodobtainsthehighestqualityofbothinfrared green box renders much better textures even in a relatively
+targets and visible features, and fuses both modalities in a low-lightscene.Nevertheless,FusionGANandPMGIarenot
+natural manner. Although DenseFuse and FusionGAN can abletotacklesuchproblems,theyappeardarkandfuzzyin
+alsoproducerelativelydesirableforegroundtargets,theyfail theboxedregion.Wegivethiscredittotheproposedmulti-
+to give clear background information, their images tend to level attention, in which we fuse more high-level features
+bewhetherdarkorblurry.Inaword,ourCoCoNetachieves and rearrange the importance of different feature channels.
+thebestbalanceofbothsaliencyandvividdetails. Becauseofthis,ourimagesaresharperandclearer.Although
+TarDALcanalsogivegoodqualityfusionresult,theoutput
+Qualitative Comparison on RoadScene We also display
+tendstobeinfluencedbytheglow,thusdegradingthevisi-
+thevisualcomparisonofourmethodandthestate-of-the-arts
+bility.Overall,wehavereachedthefirstclassinroadscenes
+ontypicalrealisticdrivingscenes(e.g.,roads,symbolsigns
+andourmethodismorerobustinvariousscenarios.
+and pedestrians) in Fig.9. Generally, all of these methods
+can fuse the thermal radiation and textural structure details Quantitative Comparisons on TNO We provide evalua-
+from the source image to some extent. However, RFN and tionsofallmethodsonseveralimportantmetricsdiscussedin
+FusionGANtendtohavebluredges.Ourmethod,TarDAL theabovesection.TheresultsareshowninFig.10.Itisobvi-
+andSDNetallproducevisual-friendlyfusionimages,among ousthatonTNOdataset,weachievethehighestresultsonall
+whichoursalienttargets(i.e.,thepedestriansframedbyred sixmetrics,whichdemonstratesthattheproposedCoCoNet
+boxes) are much brighter and more conspicuous. Unfortu- is able to make full use of vital features from the source
+nately, RFN fails to combine as much infrared information image.Besides,inTable1,wealsodisplaytheaveragevalue
+as other methods, and this causes their objects less clear. and standard deviation of each metric to demonstrate our
+Ontheotherhand,ourCoCoNetalsoachievesthebestper- overallperformance.ForTNOdataset,it’snotablethatonSF
+123\n--- PAGE 13 ---\n1760 InternationalJournalofComputerVision(2024)132:1748–1775
+stesataDenecsdaoRdnaONTehtnosdohtemneetruoffonosirapmocevitatitnauQ
+1elbaT
+enecSdaoR
+ONT
+DCS
+GA
+FS
+FIV
+DS
+NE
+DCS
+GA
+FS
+FIV
+DS
+NE
+dohteM
+941.0±827.1
+313.1±518.3
+1210.0±4830.0
+701.0±808.0
+318.0±578.9
+262.0±341.7
+152.0±627.1
+152.1±247.3
+7210.0±3830.0
+602.0±387.0
+419.0±538.9
+813.0±169.6
+esuFesneD
+255.0±599.0
+979.0±050.3
+3900.0±8130.0
+770.0±716.0
+318.0±499.9
+403.0±330.7
+645.0±491.1
+887.0±467.2
+7900.0±9820.0
+951.0±806.0
+101.1±750.9
+533.0±407.6
+NAGnoisuF
+855.0±753.1
+311.1±599.3
+6900.0±9830.0
+790.0±458.0
+695.0±931.01
+591.0±392.7
+183.0±026.1
+251.1±527.3
+8010.0±1730.0
+922.0±928.0
+008.0±489.9
+402.0±031.7
+IGMP
+051.0±667.1
+356.1±327.4
+5510.0±1840.0
+701.0±158.0
+956.0±709.01
+912.0±553.7
+191.0±967.1
+059.1±289.4
+9910.0±4250.0
+481.0±008.0
+521.1±002.01
+573.0±802.7
+esuFDID
+062.0±885.1
+249.0±304.3
+6700.0±5230.0
+180.0±757.0
+046.0±320.01
+472.0±212.7
+423.0±095.1
+367.0±917.2
+0700.0±5620.0
+981.0±676.0
+046.0±085.9
+733.0±188.6
+CcMNAG
+531.0±377.1
+620.1±288.2
+8700.0±3720.0
+101.0±308.0
+367.0±879.9
+752.0±603.7
+652.0±827.1
+360.1±698.2
+8700.0±4420.0
+881.0±587.0
+838.0±649.9
+542.0±641.7
+NFR
+181.0±095.1
+830.1±202.3
+1900.0±1230.0
+001.0±728.0
+907.0±800.01
+882.0±399.6
+232.0±866.1
+826.1±192.3
+8310.0±7230.0
+641.0±887.0
+281.1±047.9
+444.0±019.6
+FIEFM
+773.0±183.1
+148.1±686.4
+5610.0±5540.0
+311.0±947.0
+318.0±878.9
+123.0±099.6
+113.0±484.1
+066.1±839.3
+8410.0±4730.0
+741.0±276.0
+440.1±425.9
+463.0±056.6
+noisuF2U
+991.0±106.1
+744.1±278.3
+6310.0±4140.0
+101.0±948.0
+296.0±504.01
+753.0±449.6
+902.0±326.1
+435.2±288.4
+9220.0±4940.0
+431.0±788.0
+711.1±668.9
+364.0±510.7
+esuFniwS
+503.0±024.1
+067.1±991.5
+6510.0±6150.0
+590.0±608.0
+286.0±930.01
+642.0±042.7
+213.0±394.1
+277.1±199.4
+2810.0±2150.0
+591.0±947.0
+171.1±304.9
+903.0±098.6
+teNDS
+932.0±784.1
+199.0±421.3
+2900.0±5130.0
+201.0±567.0
+318.0±876.9
+792.0±809.6
+762.0±306.1
+874.1±730.3
+0310.0±8130.0
+531.0±917.0
+781.1±674.9
+454.0±287.6
+AoMS
+592.0±933.1
+989.0±440.4
+8600.0±5740.0
+680.0±097.0
+487.0±111.01
+542.0±012.7
+403.0±055.1
+514.1±546.4
+7110.0±2250.0
+911.0±308.0
+201.1±929.9
+724.0±832.7
+LADraT
+150.0±718.1
+100.2±735.6
+3910.0±8170.0
+190.0±458.0
+905.0±476.01
+490.0±396.7
+190.0±497.1
+696.2±769.7
+0820.0±1380.0
+862.0±398.0
+774.0±195.01
+180.0±677.7
+sruO
+cilatinisienotsebdnocesehtsaerehwdlobnisitlusertsebehT
+123\n--- PAGE 14 ---\nInternationalJournalofComputerVision(2024)132:1748–1775 1761
+Fig.10 Quantitativecomparisonoffivemetrics,i.e.,EN,SD,VIF,SF, Thethirteenstate-of-the-artmethodsareusedforcomparison.Asingle
+AGandSCD,on20imagepairsfromtheTNOdataset(thefirstrow) point(x,y)onthecurvedenotesthatthereare(100×x)%percentof
+andother20imagepairsfromtheRoadScenedataset(thesecondrow). imagepairsthathavemetricvaluesnomorethany
+isincludedinourresultsevenincomplexrealscenes,dueto
+self-adaptivelearningstrategy.
+4.3 AblationStudy
+Inthispart,wediscussthenecessityofdifferentmodulesin
+ourproposedCoCoNet.
+Fig. 11 Visual display of different architectures of MAM, where a
+skipconnectiononly,bskipconnectionwithchannelattention,cskip EffectivenessofMAMToablatetheuseofmulti-levelatten-
+connection with channel attention and backbone features, d our full tionmechanism,weremoveeitherfeaturesfrompretrained
+MAM VGGbackbone,channelattention,orboth,togeneratethree
+variations of the MAM, respectively. In Fig.11, we illus-
+andAG,weshowanoverwhelmingadvantageoverthesec-
+trate these variations along with our full MAM, where (a)
+ondbestmethod,e.g.,SwinFuseandDIDFusebyeven58%
+removes both channel attention and pretrained VGG back-
+higherscore.Thisfurtherdemonstratesthatduetothepro-
+bone, (b) removes only pretrained backbone, (c) removes
+posedself-adaptivelearning,weareabletogenerateimages
+onlychannalattentionfromMAMand(d)ourfullMAM.
+withmoregreylevels,hencemoreinformativefeatures.DID-
+The numerical results are reported in Table 2, where
+FusealsoachievesrelativelyexcellentresultsintermsofSD
+w/o ,w/o ,w/o andourscorrespondtotheafore-
+andSCD.TarDALproducessatisfyingresultsonEN. ca&vgg vgg ca
+mentioned(a),(b),(c)and(d),respectively.It’snotablethat
+QuantitativeComparisonsonRoadSceneWecanprocess removing the pretrained VGG features causes a significant
+notonlymilitaryscenes,butalsocomplexdrivingscenarios. dropinmetricsonbothTNOandRoadScenedatasets,which
+Thankstothecontrastlearning,thefusedimagecontainsdis- proves the importance of complementary high level fea-
+tinctivegreylevelswithhighcontrast.Figure10alsodisplays tures extracted from the pretrained backbone. To prove the
+aquantitativecomparisonevaluatedonRoadScenedatasetat importanceofchannelattention,wealsonoticeaboostofper-
+the second row. Generally, we achieve the best on EN, SF, formancefromw/o tow/o andfromw/o toours
+ca&vgg vgg ca
+AG, SCD and VIF and SOTA results on SD. In Table 1, onEN,SF,SDandVIF.Thisdemonstratesthatchannelatten-
+an evaluation of all methods is listed. This showcases that tion rearranges the weights of different channels obtained
+ourmethodcanfusethemostvalidinformationfromsource from both modalities, benefiting the overall textural details
+images,andourvisibilityandsharpnessareofthetoplevel ofthefusedimage.
+as well. It’s worth mentioning that the proposed CoCoNet Moreover, visual comparisons of w/o to ours are
+ca&vgg
+is58%higherthanthesecondbestSDNetonSF.Thisindi- alsoprovidedinFig.12.Itisobviousthatbyaddingthepre-
+catesmuchmoreinformationwithabundantcharacteristics trained VGG features, the acuteness of the fused image is
+123\n--- PAGE 15 ---\n1762 InternationalJournalofComputerVision(2024)132:1748–1775
+Table2 Quantitativecomparisonofdifferentmodelarchitectures
+Model TNOdataset Roadscenedataset
+EN SD VIF SF AG SCD EN SD VIF SF AG SCD
+w/o 6.564 8.965 0.705 0.0531 4.166 1.736 6.637 9.431 0.698 0.0430 4.31 1.511
+ca&vgg
+w/o 6.786 9.288 0.774 0.0596 5.645 1.681 6.839 9.611 0.769 0.0514 5.033 1.524
+vgg
+w/o 7.325 9.511 0.823 0.0675 6.536 1.703 7.288 9.980 0.833 0.0591 5.653 1.623
+ca
+Ours 7.776 10.591 0.893 0.0831 7.967 1.794 7.693 10.674 0.854 0.0718 6.537 1.817
+Thebestresultisinboldwhereasthesecondbestoneisinitalic
+Fig.12 Visualcomparison
+betweendifferentmodel
+architecturesoftheproposed
+MAM,whereaskipconnection
+only,bskipconnectionwith
+channelattention,cskip
+connectionwithchannel
+attentionandbackbonefeatures,
+dourfullMAM.ThefullMAM
+isbetterinpreserving
+informativefeatures,especially
+inthezoomed-inpatches
+greatlyimproved.Consequently,column(d)andcolumn(c)
+are much sharper than (b) and (a), e.g., the alphabets indi-
+catedbygreenboxesareclearerincolumn(c)and(d),andthe
+globalstructureinformationismoreevident.Byreorganiz-
+ingfeaturechannels,channelattentionenablesournetwork
+tofurtherremoveundesirablenoisesandretainricherdetails,
+whichisreflectedonthedifferencesbetweencolumn(c)and
+(d).
+Ablation of Features from VGG Considering that the
+low/middle/high-levelfeatures(64/128/256channels)extrac
+tedbyVGGhavedifferentcharacteristics,wecreatedsixnew
+Fig.13 VisualdisplayofvariantsthatutilizedifferentVGGfeatures
+variants for experimentation by using these three features
+separately, including those containing only low/middle/or
+high-levelfeatures,aswellasthosewithoutthem.
+ingprominenthighlightsforsignificantindividualsandhigh
+Figure 13 provides visual comparison images. It can be
+contrastforthescene.
+observed that the features exhibit similar trends in both
+InTable3,weprovidedquantitativecomparisonresultson
+datasets.Low-levelfeaturestypicallyhaveastrongresponse
+twodatasets.Thevariantwithonlythelowest-levelfeatures
+to edge and color information in the image. The variants
+achievedthesecondplaceinmostmetrics,whilethevariant
+withoutlow-levelfeatureslosealargeamountofdetailinfor-
+withoutthelowest-levelfeaturesperformedtheworst.This
+mation and produce color deviation. The variants without
+indicatesthatlow-levelfeaturesprovidemoreedgeandcolor
+middle-level and high-level features exhibit some degrada-
+information,thusbetterdescribingtheimage.Ontopofthe
+tion compared to the complete model. Among the variants
+low-level features, adding middle/high-level features actu-
+withonlyonetypeoffeature,thevariantwithonlylow-level
+allyhadanegativeimpact.Theproposedcompletemethod,
+featuresachievesrelativelygoodvisualizationeffect,while
+whichintegratesalllevelsoffeatures,achievedthebestper-
+thevariantwithonlyhigh-levelfeatureshasexcellentoverall
+formanceinallmetrics.
+contrast.Thefusionresultofthecompletemodelmaintains
+rich detail information (such as the branches in the upper Effectiveness of self-adaptive learning Additional exper-
+sceneandthebushesinthelowerscene),whilealsoachiev- iments are conducted on TNO and RoadScene datasets to
+validate the effectiveness of the self-adaptive learning. In
+Fig.14,wevisualizeperformanceofseveraltrainingweights
+123\n--- PAGE 16 ---\nInternationalJournalofComputerVision(2024)132:1748–1775 1763
+Table3 QuantitativecomparisonofdifferentfeaturesfromVGG
+Model TNODateset RoadsceneDataset
+EN SD VIF SF AG SCD EN SD VIF SF AG SCD
+OnlyLow 7.387 9.977 0.797 0.0694 6.806 1.774 7.491 10.178 0.768 0.0648 6.155 1.652
+OnlyMiddle 7.078 9.694 0.764 0.0497 4.695 1.688 7.155 9.973 0.753 0.0483 4.315 1.390
+OnlyHigh 7.081 9.642 0.781 0.0504 4.719 1.621 7.255 9.980 0.787 0.0488 4.375 1.424
+w/oLow 6.796 9.386 0.712 0.0444 4.163 1.544 6.878 9.516 0.704 0.0396 3.570 1.025
+w/oMiddle 7.338 9.678 0.756 0.0685 6.715 1.693 7.394 9.873 0.728 0.0638 6.050 1.475
+w/oHigh 7.294 9.555 0.802 0.0579 5.762 1.788 7.413 9.830 0.775 0.0582 5.571 1.641
+Ours 7.776 10.591 0.893 0.0831 7.967 1.794 7.693 10.674 0.854 0.0718 6.537 1.817
+Thebestresultisinboldwhereasthesecondbestoneisinitalic
+Fig.14 Visualcomparisonamongdifferentparametersettingofσand ingly.Notethattheself-adaptiveweightisbetterinpreservingdetailed
+γ.Thetoprowshowstheresultswithmanually-craftσandtheproposed texturaldetailsandconsiderablecontrast,especiallyinthezoomed-in
+self-adaptiveweight,thesecondrowshowstheresultsonγcorrespond- patches.Bestviewedonscreen
+Fig.15 Quantitativecomparisonbetweenhand-craftedparameterand ricvalueusingmanuallycraftedweightparameters,tuningfrom0to
+ourself-adaptiveweightontwodatasetsintermsofσ,γ,respectively. 1.Tomakethecomparison moreobvious, thesolidlinedenotes the
+ThetoprowistestedonTNOdatasetwhilethebottomrowisverified quantitativevalueusingself-adaptiveweight
+onRoadscenedataset.Inthediagram,dottedlinesrepresentthemet-
+123\n--- PAGE 17 ---\n1764 InternationalJournalofComputerVision(2024)132:1748–1775
+designed in a hand-crafted manner and the proposed self-
+adaptiveweightsmeasuredbasedoninternalcharacteristics
+ofthesourceimage.Specifically,σ andγ aretheweightsfor
+SSIMandMSE,respectively.Wedisplayfusedresultswhere
+severalpossiblefixedweightcombinationsareadopted(e.g.,
+σa ranging from 0 to 1 while making sure the sum of σa
+and σb to be 1) to compare with the self-adaptive strategy
+(presentedinthelastcolumn).AsFig.14suggests,theself-
+adaptive manner achieves much higher contrast, stressing Fig.16 Valuechangeoftheadaptiveweightsondifferenttasks
+bothsalientthermaltargetandvividdetailsfromthevisible
+imagebyusingaveragegradientandentropyinformation,as
+contrastbringsunwantednoisestothefusedresults,causing
+indicated by the green and res boxes. The grass details are
+the edge blurry (e.g., in column (a), the tree details in the
+clearer with brighter pixels, and the building structure pre-
+redboxesarelessclearerwithnoisypixels).Incolumn(b),
+serves fined edges. Overall, automatically learned weights
+wepresentresultswithinfraredregularizationonly.Despite
+cangenerateimageswithbetterglobalcontrast.
+enhancement of the salient thermal target, we still notice
+Besides,weplotquantitative resultsinFig.15tofurther
+degeneration of image quality on the visible details, mak-
+demonstrateoureffectiveness.Resultsinthefirstrawreport
+ingithardtorendervividtexturalinformation.Thisproves
+theperformanceofsixmetricswhereσ isfixedtoacertain
+thatremovingregularizationonthevisiblepartcouldharm
+valuebetween0and1,whileγ isself-adaptive.Likewise,in
+texturaldetailsinthefusionprocess.Incolumn(c),wedis-
+thesecondrow,γ ishand-crafted,whileσ islearnedbased
+play results with only visible constraints by removing the
+on source images. We notice that for both SSIM and MSE
+infrared enhancement. It is obvious that the thermal target
+weights,hand-craftedmannerfailstoadapttocharacteristics
+(e.g.,thestandingpersonindicatedbythegreenbox)isabun-
+in various images, thus reporting lower scores on six eval-
+dantinvisibledetailsbutlessbrightfortheabsenceofenough
+uationmetricsinmostcases.OnTNOdataset,ourstrategy
+guidanceofinfraredfeatures.Basedonresultsfromcolumn
+achievesaround0.2pointshigherthanfixedSSIMweights
+(d),weargue thatpatch sampling isthe mostsignificant in
+onSCD,whichishigherthanthebesthand-craftedweights.
+contrastiveregularization.Inabsenceofcorrectguidance,the
+Despite that hand-crafted weights outperform ours on cer-
+fusedimageisdegraded,withitspixeldarkerandlessclearer,
+tain points (e.g., fixed weights are slightly better on VIF
+e.g.,thepersonislessbrighterandtheimageappearsblurry
+when σ is set to 0.8), we generate images of higher qual-
+in general. In conclusion, both target and detail constrains
+itiesbyemployingfeaturesfromasingleimageitself,which
+areindispensabletoachieveourinitialgoal,thatis,combin-
+isrobusttosourceimageswithdiversecharacteristics.
+ingbothsalientthermaltargetsfromtheinfraredimageand
+InFig.16,wehavevisualizedthespecificweightvalues
+vividbackgrounddetailsfromthevisibleimage.
+ofrandomlyselected50imagepairsfromtheTNOandthe
+MRI-PETdatasets.Itisshownthattheσ lineandγ linefluc- Analysis of different masks We generated the M in vari-
+tuate on both datasets, which indicates the dynamic nature ous manners in order to investigate how the M affects the
+ofthedistinctivestructuresbetweenmodalities.Thisfurther proposedmethod.Allthreekindsofmasksareshowninthe
+provesthatunderourlosssetting,fixedσandγ weightscould first line in Fig. 18. TM is the feature weight map gener-
+notfullyexploitthestructuralinformation/pixeldistribution ated by a human detection algorithm Montabone and Soto
+ofthesourcesforfusion. (2010) guided by the saliency mechanism. In practice, we
+setathresholdtoconvertitsinceitwasoriginallynota0-1
+EffectivenessofcontrastivelearningExperimentsarefur-
+mask. UM comes from an unsupervised saliency detector
+ther conducted to verify the effectiveness of the proposed
+(Nguyenetal.,2019),whichalsomarksthedoorhighlighted
+contrastive regularization, the visual comparisons can be
+byroomtemperatureintheinfraredimage.
+foundinFig.17,where(a)meansresultswithneithertarget
+We used these three different masks for fusion, and the
+nordetailconstraint,column(b)denotesresultswithtarget
+resultsareshowninthesecondlineinFig.18.Fromthevisual
+constrain only and (c) denotes results with detail constrain
+perspective, different masks do not affect the visualization
+only.Tobettershowcasetheimportanceofsampleselection
+features of the proposed method (such as real details and
+inthecontrastiveregularization,incolumn(d),wecontrast
+highcontrast).Theperformanceoftheproposedmethodis
+imagesusingsamplesthatarenotcorrespondedtoeachother
+almostindependentofhowweobtainthemasks.
+(i.e.,imagepatchesforcontrastarerandomlyselectedfrom
+thewholedataset).Thefullcontrastivelearningisgivenin
+column(e).Obviously,thelackofbothinfraredandvisible
+123\n--- PAGE 18 ---\nInternationalJournalofComputerVision(2024)132:1748–1775 1765
+Fig.17 Visualcomparisonofdifferentsettingsofcontrastiveregular- samples,andetheproposedcontrastiveregularization.Ourmethodis
+ization,whereanocontrastiveregularization,btargetconstrainonly, betterinpreservingbothsalienttargetsandfaithfuldetails,especially
+cdetailconstrainonly,dcontrastwithrandompositiveandnegative inthezoomed-inpatches.Bestviewedonscreen
+MAMmodulecanalleviatethecomputationalcomplexityto
+some extent, it may lose some vital information during the
+fusionprocess,resultinginlossofdetailorblurredtargeton
+thefusedresult.
+4.5 Limitations
+Itisprettychallengingtoacquirepixel-levelalignedinfrared
+andvisibleimagepairsinmostreal-worldscenarios.Exist-
+Fig.18 Differentmasksandtheirfusionresults
+ing work (Tang et al., 2022; Huang et al., 2022) alleviates
+thisbyintroducingadditionalregistration(Maetal.,2019c;
+4.4 ComputationalComplexityAnalysis
+Liu et al., 2020, 2022b) module. To discuss the impact
+of fusing these slight misaligned image pairs, we initially
+Beyondqualitativeandnumericalanalysis,modelsizeand
+synthesize these slight misaligned source images through
+running speed are significant in real-world applications as
+performing random affine and elastic translations with dif-
+well. Therefore, we verify the memory consumption and
+ferentdegrees(i.e.,tiny,moderate,andextreme)ontheTNO,
+computation efficiency of the proposed model. Note that
+Roadscenedatasets,respectively.Thenweusetheproposed
+the results shown in this part might be slightly different
+methodformergingthesemisalignedsourceimages.Visual
+from the original paper due to different settings of run-
+results are shown in Fig.19, note that our method can deal
+ning platform, hyper-parameters, etc. Specifically, FLOPs
+withtheslightlymisalignedimages,whichpreservesalarge
+and trainingparameters are calculated by settinginput size
+partofvitalinformation.However,halosandartifactsemerge
+as 64×64. For running time, we select ten images from
+onthefusedresultswhenpixeldeviationissignificant.
+TNOwithsize64×64tocomputetheaveragetime.Table4
+displaysquantitativeresultsonmodelsize,FLOPsandrun-
+ningtimeamongseveralstate-of-the-artmethods.Ourmodel 4.6 ResultsandAnalysisonMIF
+is faster than all methods except for SDNet and MFEIF.
+Althoughweareslowerduetothesimplicityoftheirframe- Wecomparetheproposedmethodwithsomestate-of-the-art
+works, our model still achieves a running time under 0.1s, approaches, including three traditional methods (i.e., self-
+which is two times faster than DenseFuse and U2Fusion, adaptive sparse representation based ASR (Liu & Wang,
+three times faster than PMGI, and four times faster than 2015), convolution sparse representation and morphologi-
+FusionGAN,GANMcCandRFN.Moreover,inspitethatour calprincipalcomponentanalysisbasedCSMCA(Liuetal.,
+CoCoNet is more complicated than FusionGAN, we enjoy 2019)andcontourwavetransformbasedCurvelet(Yanget
+fasterspeed,whichdemonstratesthestrengthoftheproposed al.,2008)),threeCNN-basedmethod(i.e.,EMFusion(Xu&
+architecture.Specially,MAMmoduleneedslargeparameters Ma,2021),SDNet(Zhang&Ma,2021)andU2Fusion(Xuet
+to calculate and integrate the multi-level features for better al.,2020))andtransformerbasedSwinFuse(Maetal.,2022).
+featureextractionandtransmission.Althoughremovingthe AsSwinFusionisonlyabletodealwiththeMRI-PETimage
+123\n--- PAGE 19 ---\n1766 InternationalJournalofComputerVision(2024)132:1748–1775
+emitgninnurdnaytixelpmocledomnonosirapmocevitatitnauQ
+4elbaT
+sruO
+LADraT
+AoMS
+teNDS
+noisuFniwS
+noisuF2U
+FIEFM
+NFR
+CcMNAG
+esuFDID
+IGMP
+NAGnoisuF
+esuFesneD
+dohteM
+31.9
+792.0
+322.0
+760.0
+479.0
+956.0
+851.0
+639.01
+468.1
+162.0
+240.0
+470.0
+529.0
+)M(PT
+73.511
+73.28
+968.16
+53.73
+40.174
+43.663
+23.52
+90.676
+65.2001
+17.81
+12.547
+69.84
+69.794
+)G(SPOLF
+250.0
+200.0
+170.8
+540.0
+543.1
+321.0
+540.0
+932.0
+642.0
+550.0
+281.0
+152.0
+421.0
+)s(emiT
+cilatinisienotsebdnocesehtsaerehwdlobnisitlusertsebehT
+pairs,sothatitsresultsonlyparticipateinthecomparisonof
+MRI-PETfusiontask.
+4.6.1 MRI-PETFusionTask
+QualitativeComparisonsThecomparisonsofvisualization
+on typical MRI-PET images are shown in Fig.20. Benefit-
+ingfromthemulti-scaleattentionmechanism,theproposed
+methodcanaccuratelyretainhigh-valueinformationindif-
+ferentmodalities.Inaddition,thecontrastivelearningusing
+MRI segmentation masks, which successfully solves the
+problemthatMRIimageinformationiscoveredbyintensity
+informationofothermodalities,preventsthelossofeffective
+details. The three traditional methods have similar perfor-
+mance.TheyfocusonthepreservationofdetailsinMRI,but
+ignoretherestorationofcolorinformationinanothermodal-
+ity (the frame part of the first two sets of images). SDNet
+and U2Fusion are difficult to effectively extract and save
+information,causingseriouslossofdetailsandcolors,while
+EMFusioncausesseriouscolordistortion(theframepartof
+the last set of images). SwinFusion retains color informa-
+tion well, but it does not solve the problem of MRI details
+beingcovered.Tosumup,theproposedmethodachievesthe
+balancebetweenretainingcoloranddetailinformation,and
+achievestheoptimalvisualizationeffect.
+Quantitative Comparisons To give a better view of the
+performanceofCoCoNetonMIFtask,weprovidetheevalua-
+tionsofallmethodsonmetricsdiscussedintheabovesection.
+TheresultsareshownintheleftofTable5.Itisobviousthat
+theproposedmethodachievesthehighestresultsonEN,SD,
+SF, AG and SOTA level on SCD. SwinFusion achieves the
+highest VIF and SCD results with its characteristic high-
+lightedvisualization.
+4.6.2 MRI-SPECTFusionTask
+QualitativeComparisonsThecomparisonsofvisualization
+on typical MRI-SPECT images are shown in Fig.21. Dif-
+ferent from PET, intensity information of SPECT image is
+moresparse.TheMRIsegmentationmaskcontrastivelearn-
+ing used can better preserve the details of the MRI image
+with less interference. Other deep learning methods suffer
+informationlossindifferentdegreesandmodalities:SDNet
+and U2Fusion enable to save the details of MRI images,
+while EMFusion has a serious defect in color information
+(the frame part of the first set and the last set of images).
+Traditional methods retain intensity information, but suffer
+fromMRIpartialdarkening(theframepartofthefirsttwo
+setsofimages).
+QuantitativeComparisonsTheevaluationsofallmethods
+onmetricsareshownintherightsideofTable 5.Alldeep
+learning methods have disastrous performance on six met-
+123\n--- PAGE 20 ---\nInternationalJournalofComputerVision(2024)132:1748–1775 1767
+Fig.19 Visualresultsofourfusionmethodonunregisteredimagepairs EMI result. SMI, MMI and EMI denotes tiny misaligned, moderate
+ontheTNOandRoadscenedataset,respectively.Fromrighttoleft:vis- misalignedandextrememisalignedinfraredimage,respectively.Best
+ibleimage,infraredimage,SMI,SMIresult,MMI,MMIresult,EMI, viewedonscreen
+Fig.20 VisualcomparisonofdifferentmethodsonMRI-PETtask.Bestviewedonscreen
+rics,butwehaveachievedSOTAperformanceuponalldepth 4.7Task-DrivenEvaluation
+learningmethods.Basedontheactualanalysis,thereasons
+areasfollows:sincetheoriginalresolutionofSPECTimages The utilization of fused images encompasses not only the
+is low, the images need to be upsampled before participat- enhancement of fundamental visual observations but also
+inginfusion.Inthisprocess,manynon-uniformpixelnoises plays a pivotal role in boosting the performance of their
+areintroduced,whileconvolutionalneuralnetworkcanbetter subsequenthigh-levelvisiontasks.Unfortunately,themajor-
+processthemtoproducesmoothresults.Inthecalculationof ity of existing evaluation methods primarily focus on the
+indicators, the noise interference produces results unfavor- assessmentofvisualqualityandrelevantstatisticalindicates
+abletothedepthlearningmethod,suchasEN,SFandAG. pertainingtotheseimages.Inthissection,weadvocatefora
+Ourmethodbetterretainstheinformationofthetwomodal- task-drivenevaluationthatsurpassesthelimitationsinherent
+ities,soitissuperiortootherdeeplearningmethodsinterms intraditionalevaluationparadigms.Toachievethisobjective,
+ofmetrics.
+123\n--- PAGE 21 ---\n1768 InternationalJournalofComputerVision(2024)132:1748–1775
+sksatnoisufegamiTCEPS-IRMdnaTEP-IRMfonosirapmocevitatitnauQ
+5elbaT
+TCEPS-IRM
+TEP-IRM
+dohteM
+DCS
+GA
+FS
+FIV
+DS
+NE
+DCS
+GA
+FS
+FIV
+DS
+NE
+130.0±060.1
+933.0±198.4
+3300.0±4170.0
+710.0±254.0633.0±544.8
+192.0±229.3
+851.0±642.1603.1±075.64610.0±7201.0
+650.0±375.0
+867.0±856.8194.0±557.3
+RSA
+130.0±031.1724.0±454.53400.0±2870.0
+810.0±274.0533.0±134.8
+513.0±571.4
+071.0±813.1293.1±919.63710.0±1701.0
+660.0±546.0
+347.0±946.8425.0±739.3
+ACMSC
+820.0±230.1
+504.0±588.4
+6400.0±0470.0910.0±205.0563.0±446.8082.0±732.4
+071.0±251.1972.1±402.61510.0±1790.0
+250.0±155.0
+777.0±995.8975.0±602.4
+televruC
+830.0±585.0
+513.0±473.4
+9200.0±7360.0
+110.0±32.0584.0±873.8
+062.0±829.3
+102.0±412.1214.1±266.64710.0±9001.0
+650.0±766.0
+495.0±615.8485.0±561.4noisuFME
+220.0±400.1
+923.0±503.3
+4500.0±1260.0
+210.0±934.0732.0±936.6
+492.0±480.4
+390.0±428.0885.0±048.37700.0±6260.0
+640.0±424.0
+428.0±980.8155.0±051.4
+teNDS
+630.0±348.0
+323.0±008.3
+3300.0±3450.0
+110.0±652.0412.0±972.7
+272.0±279.3
+162.0±616.0158.0±726.46700.0±2360.0
+820.0±444.0
+396.0±829.7885.0±880.4
+noisuF2U
+-
+-
+-
+-
+-
+-870.0±627.1454.1±209.56510.0±2770.0470.0±227.0857.0±796.8466.0±864.4
+esuFniwS
+820.0±478.0
+713.0±856.4
+9200.0±3560.0
+220.0±404.0254.0±178.8
+122.0±241.4
+042.0±454.1783.1±940.76610.0±1801.0
+750.0±546.0
+496.0±737.8953.0±894.4
+sruO
+cilatinisienotsebdnocesehtsaerehwdlobnisitlusertsebehT
+we employ a two-fold approach involving object detection
+andsemanticsegmentationtasksappliedtothefusedimages.
+Thismethodologyenablesthecomparativeanalysisofvari-
+ousinfraredandvisibleimagefusiontechniquesconcerning
+theirsubsequenthigh-levelvisiontasks.
+4.7.1 EvaluationonObjectDetection
+Objectdetectionisatraditionalandextensivelystudiedhigh-
+levelcomputervisiontask.Withthecontinuousimprovement
+of multi-modality datasets, its ability to reflect semantic
+informationintheevaluationofmulti-modalityimagefusion
+techniqueshasbecomeincreasinglyprominent.Inthissub-
+section,wefocusondiscussingtheimpactofimagefusion
+onobjectdetection.
+Implementation details We conducted experiments on
+the latest M3FD dataset using the state-of-the-art detec-
+tor YOLOv5.3 To ensure a fair comparison, we used the
+YOLOv5smodelanddirectlyinputthefusionresultsofvar-
+iousmethodsintothedetectorforretraining.Wethentested
+theretrained models on thesamerandomly partitioned test
+set.Allsettingsofthedetectorfollowitsoriginalconfigura-
+tion,andthequantitativeresultsaredirectlyoutputbyitstest
+code.
+QuantitativeComparisonsThequantitativeresultsobtained
+fromtheexperimentsareshowninTable6.mAP@.5repre-
+sentsthemAP(meanaverageprecision)valuewhenmIoUis
+0.5,mAP@.5:.95representstheaverageofallmAPvalues
+atdifferentIoUthresholds(from0.5to0.95instepsof0.05),
+andothervaluesrepresenttheAP(averageprecision)ofthe
+correspondingclasses.
+We conducted a horizontal comparison with the same
+benchmark methods as in the previous parts. In terms of
+the most concerned metric mAP@.5, the proposed method
+didnotachievethetoptworesultsbutstillperformedfavor-
+ably(rankedthird).TarDAL,optimizedforobjectdetection,
+achieved the best result, while DIDFuse, capable of gen-
+erating well-fused images, ranked second. Regarding the
+more comprehensive metric mAP@.5:.95, which reflects
+theperformanceacrossdifferentIoU,CoCoNetrankedsec-
+ond,demonstratingitsdetectionsuperiorityamongcommon
+fusionmethods.Inaddition,differentmethodsshowedpref-
+erential performance for different labels in their respective
+classAPs.
+Qualitative Comparisons To illustrate the advantages of
+our proposed method in facilitating downstream detection
+tasks, we provide two visual examples in Fig.22, both of
+whichhighlightthedetectionresultswithconfidencegreater
+than0.6.Scene1depictsapedestriandetectionscenarioin
+3 https://github.com/ultralytics/yolov5
+123\n--- PAGE 22 ---\nInternationalJournalofComputerVision(2024)132:1748–1775 1769
+Fig.21 VisualcomparisonofdifferentmethodsonMRI-SPECTtask.Bestviewedonscreen
+Table6 Quantitativeresultsof
+Method M3FDdataset
+objectdetectionontheM3FD
+datasetswithretraineddetectors People Car Bus Motor Truck Lamp mAP@.5 mAP@.5:.95
+(YOLOv5)foreachmethod
+SMoA 65.9 88.5 95.2 69.5 71.7 90.7 80.3 53.5
+DenseFuse 66.1 88.3 95.2 69.6 73.0 90.7 80.5 53.9
+SDNet 67.4 88.5 95.2 69.4 68.9 89.6 79.8 53.8
+PMGI 67.2 88.8 95.2 67.5 71.5 88.3 79.9 53.7
+DIDFuse 66.6 88.1 96.8 69.8 72.9 89.7 80.8 54.1
+GANMcC 65.6 88.3 96.1 70.4 73.3 88.8 80.4 53.6
+MFEIF 65.1 88.1 95.4 68.9 74.7 89.8 80.3 53.8
+FusionGAN 64.2 81.4 88.8 69.2 65.4 89.5 76.4 51.2
+SwinFusion 65.7 87.9 96.3 68.5 74.0 89.2 80.3 53.6
+RFN 66.6 88.1 95.8 67.9 71.3 91.2 80.1 53.9
+TarDAL 65.7 88.4 96.1 71.2 73.2 90.7 80.9 54.5
+U2Fusion 65.7 88.3 95.2 68.5 73.9 88.8 80.1 54.1
+Ours 65.1 88.5 94.6 71.8 73.8 90.6 80.7 54.2
+Thebestresultisinboldwhereasthesecondbestoneisinitalic
+overcastweather.Thefusionresultsoftheproposedmethod no contrastive regularization, w/ L : target constrain only,
+ir
+highlight the pedestrians, creating a high-contrast visual w/ L vis : detail constrain only), and the quantitative results
+effect that fits well with the detection network, achieving areshowninTable7.
+the best detection performance. Conversely, methods such IntermsofmAP,theproposedmethodhasaclearadvan-
+as FusionGAN and U2Fusion produce blurred outlines of tage, followed closely by the variant without contrastive
+the person, resulting in low detection confidence. Scene 2 learning.Meanwhile,addingconstraintsforobjectordetail
+showsadrivingdetectionscenario,whichbetterreflectsthe separately had a negative impact on the overall detection
+degreetowhichfusionmethodspreserveandutilizevisible results. In addition, it is worth noting that the variant with
+information.Ourfusionresultretainrichvisibleinformation the object constraint indeed exhibits stronger sensitivity to
+whileachievingthebestdetectionperformance,whichmeets salient objects in the scene, resulting in excellent APs for
+therequirementsofthisspecialscenario. categoriessuchaspersonandbus.However,thevariantwith
+onlythedetailconstraintcannotadapttosubsequentdetec-
+Ablation of Contrastive Learning To further investigate
+tiontasks.Thecompletemethodwithtarget-detailcoupling
+theimpactoftheadoptedcontrastivelearningontheobject
+achievesexcellentintegrationandutilizationofthetwocon-
+detection task, we also conducted corresponding object
+straints.
+detection experiments on three ablation variants (w/o CL:
+123\n--- PAGE 23 ---\n1770 InternationalJournalofComputerVision(2024)132:1748–1775
+Fig.22 VisualcomparisonofourCoCoNetwithstate-of-the-artapproachesontheM3FDdataset
+Table7 QuantitativeresultsofobjectdetectionontheM3FDdatasets training/validation/testing set split for MFNet followed the
+withretraineddetectors(YOLOv5) for eachablationvariant ofcon- conventionsofthesourcedataset.
+trastivelearning
+Quantitative Comparisons We used pixel intersection-
+Class w/oCL w/L ir w/Lvis Ours over-union(IoU)andaccuracy(Acc)toreflectthesegmen-
+People 65.2 65.8 63.0 65.1 tation expression. Table 8 reports the specific evaluation
+Car 88.3 88.3 87.5 88.5 results. As can be seen, the proposed method achieved the
+Bus 94.1 94.8 94.3 94.6 highestIoUinmajorobjectcategories,i.e.CarandPerson,
+Motor 69.1 70.0 69.7 71.8 andrankedfirstinmIoU&mAcc.Weattributethisadvan-
+tage to two points. On the one hand, our fusion network
+Truck 71.7 67.1 70.3 73.8
+removesredundantinformationbetweendifferentmodalities
+Lamp 88.7 89.2 91.5 90.6
+underthecontrastiveconstraint,retainsusefulcomplemen-
+mAP@.5 79.5 79.2 79.4 80.7
+tary information that supports a better understanding of
+mAP@.5:.95 53.7 53.2 53.5 54.2
+the overall scene. On the other hand, the proposed MAM
+Thebestresultisinboldwhereasthesecondbestoneisinitalic
+effectively integrates semantic features from the high-level
+network into the fusion process, which makes our fused
+imagescontainrichsemanticinformation.
+4.7.2 EvaluationonSemanticSegmentation
+QualitativeComparisons Weprovidevisualizedsegmen-
+Duringtheevaluationofimagefusiontechniques,semantic tation results for daytime and nighttime scenes in Fig.23.
+segmentationisabletomoreaccuratelyassessitsabilityto Visible images can better describe prominent large targets
+reflect different semantic categories. Itspixel-level classifi- duringtheday,butoverlookdistantpedestrianswithsimilar
+cation method places greater emphasis on the richness and background colors. In contrast, infrared images effectively
+accuracyofsemanticinformation.Inthissection,wefocus distinguishpedestriansatnightandsupportexcellentresult.
+on discussing the impact of image fusion on semantic seg- Thesegmentationmodelgeneratesmoreaccurateresultson
+mentation. thefusedimagesproducedbytheproposedmethod,forboth
+maintargetsandbackgroundobjects,suchasthepedestrian
+Implementation details We conducted experiments on
+within the red box in the daytime scene, and the car stops
+the MFNet dataset using the state-of-the-art semantic seg-
+withinthegreenboxinthenighttimescene.
+mentation model SegFormer (Xie et al., 2021b). For fair
+comparison, we loaded pre-trained weight mb1 and fine- AblationofContrastiveLearningSimilarly,wealsocon-
+tuned it for the same iterations on all fusion results. The ductedsemanticsegmentationexperimentsonthreevariants
+123\n--- PAGE 24 ---\nInternationalJournalofComputerVision(2024)132:1748–1775 1771
+Table8 QuantitativesemanticsegmentationresultsofdifferentmethodsontheMFNetdataset
+Methods Unlabel Car Person Bike Curve CarStop Cone Bump mAcc mIoU
+Acc IoU Acc IoU Acc IoU Acc IoU Acc IoU Acc IoU Acc IoU Acc IoU
+SMoA 98.1 97.4 93.0 81.0 85.3 63.7 76.7 58.1 53.6 28.1 69.5 18.1 85.1 39.2 85.8 29.6 73.2 46.7
+DenseFuse 98.2 97.7 94.1 82.4 87.3 66.0 86.6 57.0 65.3 39.2 53.3 12.2 87.9 38.5 79.6 27.0 73.0 47.2
+SDNet 98.1 97.6 93.6 81.4 88.7 65.4 83.1 58.3 63.3 29.2 56.3 12.3 88.5 41.5 89.3 42.1 73.5 47.6
+PMGI 98.2 97.4 91.9 80.6 86.1 65.8 80.0 56.4 56.8 30.9 64.9 10.0 92.5 32.6 68.5 43.1 71.9 47.0
+DIDFuse 98.1 96.9 89.1 78.0 82.9 59.6 70.5 53.4 34.2 20.6 49.0 25.1 82.4 34.7 59.5 20.1 63.1 43.3
+GANMcC 98.0 97.3 91.0 79.4 86.0 60.8 79.4 54.6 62.9 25.6 66.0 18.0 66.7 38.7 75.6 37.5 69.5 45.8
+MFEIF 98.0 97.5 94.9 80.6 87.9 63.2 81.6 57.2 63.5 30.9 60.1 19.0 88.7 35.9 66.3 37.5 71.2 46.9
+FusionGAN 98.0 97.2 87.4 76.5 86.6 63.9 82.1 52.7 67.2 32.1 64.3 14.0 80.9 37.0 83.6 38.7 72.3 45.8
+SwinFusion 97.9 97.6 96.6 80.0 89.1 66.2 83.7 57.0 70.2 36.5 74.2 17.8 88.8 37.3 62.3 11.4 74.1 45.2
+RFN 98.2 97.3 91.4 77.5 86.5 63.9 71.0 51.1 61.0 38.4 51.5 17.4 76.6 36.8 63.9 47.2 67.3 48.3
+TarDAL 98.2 97.6 92.4 80.8 87.9 65.5 79.0 60.1 59.0 29.8 69.2 26.8 89.3 36.9 72.7 32.5 72.2 48.0
+U2Fusion 98.0 97.6 95.7 81.6 85.5 64.3 79.1 61.0 78.8 12.8 70.6 17.2 84.0 42.5 77.3 47.9 74.8 47.5
+Ours 98.3 97.8 95.3 83.6 87.5 68.4 84.1 59.7 67.3 38.6 75.0 23.5 91.8 38.1 84.3 25.6 76.1 48.5
+Thebestresultisinboldwhereasthesecondbestoneisinitalic
+Fig.23 VisualcomparisonofourCoCoNetwithstate-of-the-artapproachesontheMFNetdataset
+(w/oCL,w/L ir ,andw/L vis ),andthequantitativeresultsof 4.8 ExtensiontoOtherFusionTasks
+IoUareshowninTable9.
+It can be seen that the overall performance of the vari- Toillustratethebroadapplicabilityofourmethod,weexpand
+ants without contrastive constraint is poor. Among the two theCoCoNettotacklevariousissuesrelatedtoothermulti-
+variants with single-sided constraint, the target of w/ L modality image fusion. For instance, we apply it for the
+ir
+improves the overall segmentation quality more than the fusion of green fluorescent protein (GFP) and phase con-
+detailofw/L vis ,becauseitismorebeneficialfortheextrac- trast(PC)images,aswellasnearinfrared(NIR)andvisible
+tion,learning,andapproximationofinfraredsalientcontent (VIS)images.
+whendealingwithmorenighttimescenesintheuseddataset. InthefusionofGFPandPCimages,GFPrepresentsinten-
+The proposed complete contrastive constraint achieves the sityandcolorinformation,similartotheroleofPET/SPECT
+best performance on multiple categories and two average images,whilePCrepresentsstructureanddetailinformation,
+indicators, demonstrating the outstanding performance of similartotheroleofMRIimages.Similarly,NIRimagespro-
+usingbothconstraintinparallel. vide rich background information, while VIS images offer
+clearforegroundcontent.Therefore,theproposedmethodis
+abletobecompetentforthesetasks.
+123\n--- PAGE 25 ---\n1772 InternationalJournalofComputerVision(2024)132:1748–1775
+Table9 QuantitativeresultsofsemanticsegmentationontheMFNet
+datasetswithretrainedSegformerforeachablationvariantofcontrastive
+FurtherDiscussiononGeneralityItisworthnotingthatwe
+learning
+testedalltheaforementionedtasksdirectlyonthepre-trained
+Class w/oCL w/L ir w/Lvis Ours modulewithoutfine-tuning,astheyarenotyetapplicableto
+theproposedcoupledcontrastivelearningstrategy.
+Unlabeled 97.1 97.6 97.3 97.8
+As explained above, GFP and PC image fusion tends to
+Car 76.8 80.9 78.6 83.6
+be similar to MRI and PET image fusion, but PC images
+Person 57.2 65.7 62.3 68.4
+lacktheinformationcontentthatcanprovideMRIsegmen-
+Bike 57.5 59.5 57.4 59.7
+tationmasks,astheymostlycapturegradientdetailsonlines
+Curve 16.6 25.3 16.3 38.6
+insteadofslightlylargerareasofpixels.Concurrently,NIR
+CarStop 22.3 18.8 30.9 23.5
+andVISimagesarenaturalimagesacquiredfromdifferent
+ColorCone 37.2 37.7 37.6 38.1
+butclosebands,withapproximateoverallscenefeaturesand
+Bump 35.4 32.4 6.5 25.6
+textureinformation.Thesmallmagnitudesoftheirmodaldif-
+mIoU 44.6 46.8 43.2 48.5
+ferencesposechallengesfordesigninganappropriatemask
+mAcc 73.5 70.4 65.7 76.1
+toconformtotheconstraintsofthecoupledcontrastivelearn-
+Thebestresultisinboldwhereasthesecondbestoneisinitalic ing.
+We believe that in order to properly transfer and apply
+CCL to other image fusion tasks, it is necessary to con-
+siderwhetherthetargetmulti-modalityimagesaresufficient
+to generate interpretable and meaningful contrastive learn-
+ing masks. This constitutes not only a pivotal impediment
+to its generalizability, but also an essential precondition to
+ensureitsefficacy.Weintendtodelvedeeperintothistopic
+infuturework,withtheaimofrefiningtheCCLandpoten-
+tiallyproposingnewmethod.
+5 Conclusion
+This paper proposes a novel contrastive learning network
+with integrated multi-level features for fusing infrared and
+visible images. We develop twin contrastive constraints to
+preserve typical features and avoid the redundant features
+during the fusion process. As a result, the twin contrastive
+constraints can achieve better visual effects in a soft man-
+ner,i.e.,salientthermaltargetsandrichfaithfuldetails.We
+also design a multi-level attention in our network to learn
+richhierarchicalfeaturerepresentationandensemblebetter
+transmission.Besides,aself-adaptationweightisdesignedto
+overcomethelimitationofthemanually-crafttrade-ofweight
+inthelossfunction.Thequalitativeandquantitativeresults
+Fig.24 Visualdisplayofextensiontootherfusiontasks demonstrate that the proposed method achieves the SOTA
+performancewithhighefficiency.Moreover,ablationexper-
+iments valid the effectiveness of our method. Furthermore,
+ThequalitativeresultsareshowninFig.24,whichdemon- weextendourCoCoNettoapplyonmedicalimagefusion,
+strate that the proposed CoCoNet generates fused images and it can also achieve an superior performance compared
+with promising visual results. Specifically, CoCoNet pre- withotherstate-of-the-artapproaches.
+servetheedgeinformationinthephasecontrastimageswhile
+introducingthecolorinformationofgreenfluorescentprotein Acknowledgements This work is partially supported by the China
+Postdoctoral Science Foundation (2023M730741), and the National
+withlowdeterioration.Inthesecondtask,CoCoNetachieve
+Natural Science Foundation of China (Nos. 62302078, 22B2052,
+highcontrastwhileretainingtherichtextureinformationin
+62027826),theNationalKeyR&DProgramofChina(No.2022YFA10
+theNIRimages(seetheareasinredboxesfordetails). 04101).
+123\n--- PAGE 26 ---\nInternationalJournalofComputerVision(2024)132:1748–1775 1773
+AvailabilityofSupportingData Figuresusedinthisstudyhavebeen Kim,M.,Han,D.K.,&Ko,H.(2016).Jointpatchclustering-baseddic-
+depositedingithub(https://github.com/runjia0124/CoCoNet). tionarylearningformultimodalimagefusion.InformationFusion,
+27,198–214.
+Lei,J.,Li,J.,&Liu,J.,etal.(2023).Galfusion:Multi-exposureimage
+fusion via a global-local aggregation learning network. IEEE
+TransactionsonInstrumentationandMeasurement.
+References Lewis,J.J.,O’Callaghan,R.J.,Nikolov,S.G.,etal.(2007).Pixel-and
+region-based image fusion with complex wavelets. Information
+Fusion,8(2),119–130.
+Abdi,H.,&Williams,L.J.(2010).Principalcomponentanalysis.Wiley Li,H.,&Wu,X.J.(2018).Densefuse:Afusionapproachtoinfrared
+Interdisciplinary Reviews: Computational Statistics, 2(4), 433– andvisibleimages.IEEETIP,28(5),2614–2623.
+459. Li, H., Wu, X. J., & Kittler, J. (2018a). Infrared and visible image
+Aslantas, V., & Bendes, E. (2015). A new image quality metric for fusionusingadeeplearningframework.In201824thinternational
+image fusion: The sum of the correlations of differences. Aeu- conferenceonpatternrecognition(ICPR),IEEE(pp.2705–2710).
+InternationalJournalofElectronicsandCommunications,69(12), Li,H.,Wu,X.J.,&Kittler,J.(2021).RFN-nest:Anend-to-endresid-
+1890–1896. ualfusionnetworkforinfraredandvisibleimages.Information
+Bavirisetti, D. P. (2017). Multi-sensor image fusion based on fourth Fusion,73,72–86.
+orderpartialdifferentialequations.In20thInternationalConfer- Li,J.,Liu,J.,Zhou,S.,etal.(2022).Learningacoordinatednetworkfor
+enceonInformationFusion(Fusion). detail-refinementmultiexposureimagefusion.IEEETransactions
+Bhatnagar,G.,Wu,Q.J.,&Liu,Z.(2013).Directivecontrastbased onCircuitsandSystemsforVideoTechnology,33(2),713–727.
+multimodalmedicalimagefusioninNSCTdomain.IEEETMM, Li,J.,Chen,J.,&Liu,J.,etal.(2023a).Learningagraphneuralnetwork
+15(5),1014–1024. withcrossmodalityinteractionforimagefusion.InACMMM.
+Cui,G.,Feng,H.,Xu,Z.,etal.(2015).Detailpreservedfusionofvisible Li,J.,Liu,J.,&Zhou,S.,etal.(2023b).Gesenet:Ageneralsemantic-
+andinfraredimagesusingregionalsaliencyextractionandmulti- guided network with couple mask ensemble for medical image
+scale image decomposition. Optics Communications, 341(341), fusion.IEEETransactionsonNeuralNetworksandLearningSys-
+199–209. tems.
+DaCunha,A.L.,Zhou,J.,&Do,M.N.(2006).Thenonsubsampled Li,S.,Kang,X.,&Hu,J.(2013).Imagefusionwithguidedfiltering.
+contourlettransform:theory,design,andapplications.IEEETIP, IEEETIP,22(7),2864–2875.
+15(10),3089–3101. Li,W.,Du,J.,Zhao,Z.,etal.(2018).Fusionofmedicalsensorsusing
+Dosovitskiy,A.,Beyer,L.,&Kolesnikov,A.,etal.(2020).Animageis adaptive cloud model in local laplacian pyramid domain. IEEE
+worth16x16words:Transformersforimagerecognitionatscale. TBE,66(4),1172–1183.
+arXivpreprintarXiv:2010.11929. Li,X.,Zhong,Z.,&Wu,J.,etal.(2019).Expectation-maximization
+Duan, Z., Lan, J., & Xu, Y., et al. (2017). Pedestrian detection via attentionnetworksforsemanticsegmentation.InICCV(pp.9167–
+bi-directionalmulti-scaleanalysis.InACMMM,ACM(pp.1023– 9176).
+1031). Li,Y.,&Chi,Z.(2005).MRbrainimagesegmentationbasedonself-
+Eskicioglu,A.M.,&Fisher,P.S.(1995).Imagequalitymeasuresand organizing map network. International Journal of Information
+theirperformance.IEEETCOM,43(12),2959–2965. Technology,11(8),45–53.
+Fan,X.,Li,Z.,Li,Z.,etal.(2023).Automatedlearningfordeformable Liu,J.,Fan,X.,&Jiang,J.,etal.(2021a).Learningadeepmulti-scale
+medicalimageregistrationbyjointlyoptimizingnetworkarchi- featureensembleandanedge-attentionguidanceforimagefusion.
+tectures and objective functions. IEEE Transactions on Image InIEEETCSVT.
+Processing,32,4880–4892. Liu, J., Shang, J., & Liu, R., et al. (2021b). Halder: Hierarchi-
+Gangapure,V.N.,Nanda,S.,&Chowdhury,A.S.(2017).Superpixel- cal attention-guided learning with detail-refinement for multi-
+basedcausalmultisensorvideofusion.IEEETCSVT,28(6),1263– exposureimagefusion.InICME.IEEE(pp.1–6).
+1272. Liu,J.,Wu,Y.,Huang,Z.,etal.(2021).SMOA:Searchingamodality-
+Han,Y.,Cai,Y.,Cao,Y.,etal.(2013).Anewimagefusionperformance orientedarchitectureforinfraredandvisibleimagefusion.IEEE
+metricbasedonvisualinformationfidelity.InformationFusion, SignalProcessingLetters,28,1818–1822.
+14(2),127–135. Liu,J.,Fan,X.,&Huang,Z.,etal.(2022a).Target-awaredualadver-
+He,K.,Fan,H.,&Wu,Y.,etal.(2020).Momentumcontrastforunsu- sariallearningandamulti-scenariomulti-modalitybenchmarkto
+pervisedvisualrepresentationlearning.InIEEE/CVFCVPR(pp. fuseinfraredandvisibleforobjectdetection.InProceedingsofthe
+9729–9738). IEEE/CVFconferenceoncomputervisionandpatternrecognition
+Henaff, O. (2020). Data-efficient image recognition with contrastive (pp.5802–5811).
+predictivecoding.InICML,PMLR(pp.4182–4192). Liu, J., Jiang, Z., & Wu, G., et al. (2022b). A unified image fusion
+Huang,Z.,Wang,X.,&Huang,L.,etal.(2019).CCNET:Criss-cross frameworkwithflexiblebilevelparadigmintegration.TheVisual
+attentionforsemanticsegmentation.InICCV (pp.603–612). Computer1–18.
+Huang,Z.,Liu,J.,&Fan,X.,etal.(2022).Reconet:Recurrentcorrec- Liu,J.,Shang,J.,Liu,R.,etal.(2022).Attention-guidedglobal-local
+tionnetworkforfastandefficientmulti-modalityimagefusion.In adversarial learning for detail-preserving multi-exposure image
+EuropeanconferenceoncomputerVision,Springer(pp.539–555). fusion.IEEETransactionsonCircuitsandSystemsforVideoTech-
+Hyvärinen, A., & Oja, E. (2000). Independent component analysis: nology,32(8),5026–5040.
+Algorithmsandapplications.NeuralNetworks,13(4–5),411–430. Liu,J.,Liu,Z.,&Wu,G.,etal.(2023a).Multi-interactivefeaturelearn-
+Jiang,Z.,Zhang,Z.,&Fan,X.,etal.(2022a).Towardsallweatherand ingandafull-timemulti-modalitybenchmarkforimagefusionand
+unobstructedmulti-spectralimagestitching:Algorithmandbench- segmentation.InProceedingsoftheIEEE/CVFinternationalcon-
+mark.InProceedingsofthe30thACMinternationalconference ferenceoncomputervision(pp.8115–8124).
+onmultimedia(pp.3783–3791). Liu, J., Wu, G., Luan, J., et al. (2023). Holoco: Holistic and local
+Jiang,Z.,Zhang,Z.,&Yu,Y.,etal.(2022b).Bilevelmodelinginvesti- contrastive learning network for multi-exposure image fusion.
+gatedgenerativeadversarialframeworkforimagerestoration.The InformationFusion,95,237–249.
+VisualComputer1–13.
+123\n--- PAGE 27 ---\n1774 InternationalJournalofComputerVision(2024)132:1748–1775
+Liu,R.,Li,Z.,Zhang,Y.,etal.(2020).Bi-levelprobabilisticfeature Ma,L.,Liu,R.,&Wang,Y.,etal.(2022b).Low-lightimageenhance-
+learning for deformable image registration. Proceedings of the mentviaself-reinforcedretinexprojectionmodel.IEEETransac-
+Twenty-Ninth International Joint Conference on Artificial Intel- tionsonMultimedia.
+ligence,IJCAI,2020,723–730. Ma,L.,Ma,T.,&Liu,R.,etal.(2022c).Towardfast,flexible,androbust
+Liu,R.,Liu,J.,Jiang,Z.,etal.(2021).Abilevelintegratedmodelwith low-lightimageenhancement.InProceedingsoftheIEEE/CVF
+data-drivenlayerensembleformulti-modalityimagefusion.IEEE conferenceoncomputervisionandpatternrecognition(pp.5637–
+TIP,30,1261–1274.https://doi.org/10.1109/TIP.2020.3043125 5646).
+Liu,R.,Ma,L.,&Zhang,J.,etal.(2021).Retinex-inspiredunrolling Ma,L.,Jin,D.,&An,N.,etal.(2023).Bilevelfastsceneadaptationfor
+with cooperative prior architecture search for low-light image low-lightimageenhancement.arXivpreprintarXiv:2306.01343.
+enhancement. In Proceedings of the IEEE/CVF conference on Meng, F., Song, M., Guo, B., et al. (2017). Image fusion based on
+computervisionandpatternrecognition(pp.10,561–10,570). objectregiondetectionandnon-subsampledcontourlettransform.
+Liu,R.,Jiang,Z.,Yang,S.,etal.(2022).Twinadversarialcontrastive Computers&ElectricalEngineering,62,375–383.
+learning for underwater image enhancement and beyond. IEEE Montabone,S.,&Soto,A.(2010).Humandetectionusingamobile
+TransactionsonImageProcessing,31,4922–4936. platformandnovelfeaturesderivedfromavisualsaliencymech-
+Liu,R.,Li,Z.,Fan,X.,etal.(2022).Learningdeformableimagereg- anism.ImageandVisionComputing,28(3),391–402.
+istrationfromoptimization:Perspective,modules,bileveltraining Nguyen, T., Dax, M., & Mummadi, C. K., et al. (2019). Deepusps:
+andbeyond.IEEETransactionsonPatternAnalysisandMachine Deeprobustunsupervisedsaliencypredictionviaself-supervision.
+Intelligence,44(11),7688–7704. AdvancesinNeuralInformationProcessingSystems32.
+Liu,R.,Ma,L.,Ma,T.,etal.(2022).Learningwithnestedscenemodel- Parikh,A.P.,Täckström,O.,&Das,D.,etal.(2016).Adecompos-
+ingandcooperativearchitecturesearchforlow-lightvision.IEEE ableattentionmodelfornaturallanguageinference.arXivpreprint
+TransactionsonPatternAnalysisandMachineIntelligence,45(5), arXiv:1606.01933.
+5953–5969. Petrovic,V.S.,&Xydeas,C.S.(2004).Gradient-basedmultiresolution
+Liu,Y.,&Wang,Z.(2015).Simultaneousimagefusionanddenoising imagefusion.IEEETIP,13(2),228–237.
+withadaptivesparserepresentation.IETImageProcessing,9(5), Pu,M.,Huang,Y.,&Guan,Q.,etal.(2018).Graphnet:Learningimage
+347–357. pseudoannotationsforweakly-supervisedsemanticsegmentation.
+Liu,Y.,Liu,S.,&Wang,Z.(2015).Ageneralframeworkforimage InACMMM,ACM(pp.483–491).
+fusionbasedonmulti-scaletransformandsparserepresentation. Roberts,W.J.,Van,J.A.A.,&Ahmed,F.(2008).Assessmentofimage
+InformationFusion,24,147–164. fusionproceduresusingentropy,imagequality,andmultispectral
+Liu,Y.,Chen,X.,Ward,R.K.,etal.(2019).Medicalimagefusionvia classification.JournalofAppliedRemoteSensing,2(1),1–28.
+convolutionalsparsitybasedmorphologicalcomponentanalysis. Simonyan, K., & Zisserman, A. (2014). Very deep convolutional
+IEEESignalProcessingLetters,26(3),485–489. networks for large-scale image recognition. arXiv preprint
+Liu,Z.,Liu,J.,&Wu,G.,etal.(2023c).Bi-leveldynamiclearningfor arXiv:1409.1556.
+jointlymulti-modalityimagefusionandbeyond.InIJCAI. Tang, L., Deng, Y., Ma, Y., et al. (2022). Superfusion: A versatile
+Liu,Z.,Liu,J.,&Zhang,B.,etal.(2023d).PAIF:Perception-aware imageregistrationandfusionnetworkwithsemanticawareness.
+infrared-visibleimagefusionforattack-tolerantsemanticsegmen- IEEE/CAAJournalofAutomaticaSinica,9(12),2121–2137.
+tation.InACMMM. Tu,T.M.,Huang,P.S.,Hung,C.L.,etal.(2004).Afastintensity-hue-
+Lu,X.,Zhang,B.,Zhao,Y.,etal.(2014).Theinfraredandvisibleimage saturation fusion technique with spectral adjustment for Ikonos
+fusionalgorithmbasedontargetseparationandsparserepresen- imagery.IEEEGRSLS,1(4),309–312.
+tation.InfraredPhysics&Technology,67,397–407. Vaswani,A.,Shazeer,N.,&Parmar,N.,etal.(2017a).Attentionisall
+Lv, F., Li, Y., & Lu, F. (2019). Attention guided low-light image youneed.AdvancesinNeuralInformationProcessingSystems30.
+enhancementwithalargescalelow-lightsimulationdataset.arXiv Vaswani,A.,Shazeer,N.,&Parmar,N.,etal.(2017b).Attentionisall
+preprintarXiv:1908.00682. youneed.InAdvancesinneuralinformationprocessingsystems
+Ma,J.,Chen,C.,Li,C.,etal.(2016).Infraredandvisibleimagefusion (pp.5998–6008).
+viagradienttransferandtotalvariationminimization.Information VS, V., Valanarasu, J. M. J., & Oza, P., et al. (2021). Image fusion
+Fusion,31,100–109. transformer.arXivpreprintarXiv:2107.09011.
+Ma,J.,Zhou,Z.,Wang,B.,etal.(2017).Infraredandvisibleimage Wang,D.,Liu,J.,&Fan,X.,etal.(2022).Unsupervisedmisaligned
+fusion based on visual saliency map and weighted least square infraredandvisibleimagefusionviacross-modalityimagegener-
+optimization.InfraredPhysics&Technology,82,8–17. ationandregistration.arXivpreprintarXiv:2205.11876.
+Ma,J.,Ma,Y.,&Li,C.(2019).Infraredandvisibleimagefusionmeth- Wang, D., Liu, J., Liu, R., et al. (2023). An interactively reinforced
+odsandapplications:Asurvey.InformationFusion,45,153–178. paradigm for joint infrared-visible image fusion and saliency
+Ma,J.,Yu,W.,Liang,P.,etal.(2019).Fusiongan:Agenerativeadver- objectdetection.InformationFusion,98(101),828.
+sarialnetworkforinfraredandvisibleimagefusion.Information Wang, Z., Bovik, A. C., Sheikh, H. R., et al. (2004). Image quality
+Fusion,48,11–26. assessment:Fromerrorvisibilitytostructuralsimilarity.IEEETIP,
+Ma,J.,Zhao,J.,Jiang,J.,etal.(2019).Localitypreservingmatching. 13(4),600–612.
+InternationalJournalofComputerVision,127,512–531. Wong,M.H.,Giraldo,J.P.,Kwak,S.Y.,etal.(2017).Nitroaromatic
+Ma,J.,Xu,H.,Jiang,J.,etal.(2020).Ddcgan:Adual-discriminatorcon- detectionandinfraredcommunicationfromwild-typeplantsusing
+ditionalgenerativeadversarialnetworkformulti-resolutionimage plantnanobionics.NatureMaterials,16(2),264–271.
+fusion.IEEETIP,29,4980–4995. Wu,H.,Qu,Y.,&Lin,S.,etal.(2021).Contrastivelearningforcompact
+Ma,J.,Zhang,H.,Shao,Z.,etal.(2020).Ganmcc:Agenerativeadver- singleimagedehazing.InIEEE/CVFCVPR(pp.10,551–10,560).
+sarialnetworkwithmulticlassificationconstraintsforinfraredand Xie,E.,Ding,J.,&Wang,W.,etal.(2021a).Detco:Unsupervisedcon-
+visibleimagefusion.IEEETIM,70,1–14. trastivelearningforobjectdetection.InICCV (pp.8392–8401).
+Ma,J.,Tang,L.,Fan,F.,etal.(2022).Swinfusion:Cross-domainlong- Xie, E., Wang, W., & Yu, Z., et al. (2021b). Segformer: Simple and
+range learning for general image fusion via swin transformer. efficient design for semantic segmentation with transformers.
+IEEE/CAAJournalofAutomaticaSinica,9(7),1200–1217. AdvancesinNeuralInformationProcessingSystems34,12,077–
+12,090.
+123\n--- PAGE 28 ---\nInternationalJournalofComputerVision(2024)132:1748–1775 1775
+Xu,H.,&Ma,J.(2021).Emfusion:Anunsupervisedenhancedmedical Zhang,Z.,Lin,Z.,Xu,J.,etal.(2021).Bilateralattentionnetworkfor
+imagefusionnetwork.InformationFusion,76,177–186. RGB-Dsalientobjectdetection.IEEETIP,30,1949–1961.
+Xu,H.,Liang,P.,&Yu,W.,etal.(2019).Learningagenerativemodel Zhao,W.,Lu,H.,&Wang,D.(2018).Multisensorimagefusionand
+forfusinginfraredandvisibleimagesviaconditionalgenerative enhancementinspectraltotalvariationdomain.IEEETMM,20(4),
+adversarial network with dual discriminators. In IJCAI-19 (pp. 866–879.
+3954–3960). Zhao, Z., Xu, S., & Zhang, C., et al. (2020a). Didfuse: Deep image
+Xu,H.,Ma,J.,&Jiang,J.,etal.(2020).U2fusion:Aunifiedunsuper- decompositionforinfraredandvisibleimagefusion.arXivpreprint
+visedimagefusionnetwork.InIEEETPAMI. arXiv:2003.09210.
+Yan,X.,Qin,H.,Li,J.,etal.(2015).Infraredandvisibleimagefusion Zhao,Z.,Xu,S.,Zhang,C.,etal.(2020).Bayesianfusionforinfrared
+withspectralgraphwavelettransform.JOSAA,32(9),1643–1652. andvisibleimages.SignalProcessing,177(107),734.
+Yang,L.,Guo,B.L.,&Ni,W.(2008).Multimodalitymedicalimage Zhao,Z.,Bai,H.,&Zhang,J.,etal.(2023a).Cddfuse:Correlation-
+fusionbasedonmultiscalegeometricanalysisofcontourlettrans- driven dual-branch feature decomposition for multi-modality
+form.Neurocomputing,72(1),203–211. imagefusion.InProceedingsoftheIEEE/CVFconferenceoncom-
+Yin,M.,Duan,P.,Liu,W.,etal.(2017).Anovelinfraredandvisible putervisionandpatternrecognition(pp.5906–5916).
+imagefusionalgorithmbasedonshift-invariantdual-treecomplex Zhao,Z.,Bai,H.,&Zhu,Y.,etal.(2023b).DDFM:Denoisingdiffusion
+shearlet transform and sparse representation. Neurocomputing, modelformulti-modalityimagefusion.InICCV.
+226,182–191.
+Zhang, H., & Ma, J. (2021). Sdnet: A versatile squeeze-and-
+Publisher’sNote SpringerNatureremainsneutralwithregardtojuris-
+decompositionnetworkforreal-timeimagefusion.International
+dictionalclaimsinpublishedmapsandinstitutionalaffiliations.
+JournalofComputerVision,129(10),2761–2785.
+Zhang,H.,Xu,H.,&Xiao,Y.,etal.(2020a).Rethinkingtheimage
+SpringerNatureoritslicensor(e.g.asocietyorotherpartner)holds
+fusion:Afastunifiedimagefusionnetworkbasedonproportional
+exclusiverightstothisarticleunderapublishingagreementwiththe
+maintenance of gradient and intensity. In AAAI (pp. 12,797–
+author(s)orotherrightsholder(s);authorself-archivingoftheaccepted
+12,804).
+manuscriptversionofthisarticleissolelygovernedbythetermsofsuch
+Zhang, J., Lu, S., & Zhan, F., et al. (2021a). Blind image super-
+publishingagreementandapplicablelaw.
+resolutionviacontrastiverepresentationlearning.arXivpreprint
+arXiv:2107.00708.
+Zhang,Q.,Fu,Y.,&Li,H.,etal.(2013).Dictionarylearningmethod
+forjointsparserepresentation-basedimagefusion.OpticalEngi-
+neering52(5),057,006–1–057,006–11.
+Zhang,Q.,Liu,Y.,Blum,R.S.,etal.(2018).Sparserepresentationbased
+multi-sensor image fusion for multi-focus and multi-modality
+images:Areview.InformationFusion,40,57–75.
+Zhang,Y.,Li,K.,&Li,K.,etal.(2019).Residualnon-localattention
+networksforimagerestoration.arXivpreprintarXiv:1903.10082.
+Zhang,Y.,Liu,Y.,Sun,P.,etal.(2020).Ifcnn:Ageneralimagefusion
+framework based on convolutional neural network. Information
+Fusion,54,99–118.https://doi.org/10.1016/j.inffus.2019.07.011
+123

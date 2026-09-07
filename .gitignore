@@ -1,0 +1,67 @@
+# ------------------------------
+# Datasets and large data files
+# ------------------------------
+/MSRS/
+/ISNet-master/IRSTD-1k/
+/CoCoNet-main/dataset/
+/CoCoNet-main/training.h5
+/CoCoNet-main/training_mask.h5
+/CoCoNet-main/finetune_data.h5
+
+# Downloaded archives (datasets/repository bundles)
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+
+# ------------------------------
+# Weights, checkpoints and logs
+# ------------------------------
+*.pth
+*.pt
+*.pkl
+*.ckpt
+*.weights
+*.onnx
+**/result/
+**/results/
+**/results_*/
+**/logs/
+**/logs_*/
+/image_comparison/outputs/
+
+# TensorBoard event files
+events.out.tfevents.*
+
+# ------------------------------
+# Local Python environments and caches
+# ------------------------------
+**/.venv/
+**/.venv*/
+**/venv/
+**/env/
+**/__pycache__/
+*.py[cod]
+*.pyd
+
+# Native build products
+**/build/
+**/dist/
+*.obj
+*.lib
+*.dll
+
+# ------------------------------
+# IDE and OS files
+# ------------------------------
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.bak
