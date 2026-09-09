@@ -1,0 +1,5 @@
+UIU-Net SIRST test: Misc_408 to Misc_427
+Pixel accuracy: 0.835331
+IoU: 0.768427
+nIoU: 0.740053
+Paper reference: IoU=0.7825, nIoU=0.7515

@@ -1,150 +1,176 @@
-import os
-from skimage import io, transform
-import torch
-import torchvision
-from torch.autograd import Variable
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms
-# import torch.optim as optim
-from model.metrics import *
-import numpy as np
-from PIL import Image
 import glob
-import time
-import cv2
-from tqdm import tqdm
-import torch.utils.data as Data
-from utils.data import SirstDataset
+import os
 
-from thop import profile
+import torch
+from torch.utils.data import DataLoader
+from torchvision import transforms
 
-from data_loader import RescaleT
-from data_loader import ToTensor
-from data_loader import ToTensorLab
-from data_loader import SalObjDataset
-
+from data_loader import RescaleT, SalObjDataset, ToTensorLab
 from model import UIUNET
+from model.metrics import SamplewiseSigmoidMetric, SigmoidMetric
 
-# normalize the predicted SOD probability map
-def normPRED(d):
-    ma = torch.max(d)
-    mi = torch.min(d)
 
-    dn = (d-mi)/(ma-mi)
+# UIU-Net paper reproduction on the 20-image SIRST test set:
+#   images: Misc_408.jpg ... Misc_427.jpg
+#   labels: Misc_408_pixels0.png ... Misc_427_pixels0.png
 
-    return dn
 
-def save_output(image_name,pred,d_dir):
+def norm_pred(prediction):
+    """Match the min-max normalization used by the released UIU-Net test code."""
+    maximum = torch.max(prediction)
+    minimum = torch.min(prediction)
+    denominator = maximum - minimum
+    if denominator.item() <= 1e-12:
+        return torch.zeros_like(prediction)
+    return (prediction - minimum) / denominator
 
-    predict = pred
-    predict = predict.squeeze()
-    predict_np = predict.cpu().data.numpy()
 
-    im = Image.fromarray(predict_np*255).convert('RGB')
-    img_name = image_name.split(os.sep)[-1]
-    image = io.imread(image_name)
-    imo = im.resize((image.shape[1],image.shape[0]),resample=Image.BILINEAR)
+def build_test_pairs(image_dir, label_dir):
+    """Build deterministic image/label pairs instead of relying on glob order."""
+    image_paths = sorted(
+        path
+        for path in glob.glob(os.path.join(image_dir, "*"))
+        if os.path.isfile(path)
+        and os.path.splitext(path)[1].lower() in {".jpg", ".jpeg", ".png", ".bmp"}
+    )
 
-    pb_np = np.array(imo)
+    label_paths = []
+    missing_labels = []
+    for image_path in image_paths:
+        image_id = os.path.splitext(os.path.basename(image_path))[0]
+        label_path = os.path.join(label_dir, image_id + "_pixels0.png")
+        if not os.path.isfile(label_path):
+            # Also support already-renamed masks such as Misc_408.png.
+            label_path = os.path.join(label_dir, image_id + ".png")
+        if not os.path.isfile(label_path):
+            missing_labels.append(image_id)
+        label_paths.append(label_path)
 
-    aaa = img_name.split(".")
-    bbb = aaa[0:-1]
-    imidx = bbb[0]
-    for i in range(1,len(bbb)):
-        imidx = imidx + "." + bbb[i]
+    if missing_labels:
+        raise FileNotFoundError(
+            "Missing test labels for: " + ", ".join(missing_labels[:10])
+        )
 
-    imo.save(d_dir+imidx+'.png')
+    if len(image_paths) != 20:
+        raise RuntimeError(
+            "The UIU-Net SIRST paper experiment requires exactly 20 test images "
+            f"(Misc_408 to Misc_427), but found {len(image_paths)} in {image_dir}"
+        )
+
+    expected_ids = {f"Misc_{index}" for index in range(408, 428)}
+    actual_ids = {
+        os.path.splitext(os.path.basename(path))[0] for path in image_paths
+    }
+    if actual_ids != expected_ids:
+        missing = sorted(expected_ids - actual_ids)
+        unexpected = sorted(actual_ids - expected_ids)
+        raise RuntimeError(
+            "The SIRST test IDs do not match Misc_408 to Misc_427. "
+            f"Missing: {missing}; unexpected: {unexpected}"
+        )
+
+    return image_paths, label_paths
+
 
 def main():
+    model_name = "uiunet"
+    project_dir = os.getcwd()
 
-    # --------- 1. get image path and name ---------
-    model_name = 'uiunet'
+    image_dir = os.path.join(
+        project_dir, "test_data", "Quantification_Results", "test_images"
+    )
+    label_dir = os.path.join(
+        project_dir, "test_data", "Quantification_Results", "test_labels"
+    )
+    model_path = os.path.join(
+        project_dir, "saved_models", model_name, model_name + ".pth"
+    )
+    result_dir = os.path.join(project_dir, "test_data", model_name + "_results")
+    os.makedirs(result_dir, exist_ok=True)
 
+    if not os.path.isfile(model_path):
+        raise FileNotFoundError(
+            f"Model weight not found: {model_path}\n"
+            "Run python train.py first, or copy the trained weight to this path."
+        )
 
-    image_dir = os.path.join(os.getcwd(), 'test_data', 'Quantification_Results', 'test_images')
-    label_dir = os.path.join(os.getcwd(), 'test_data', 'Quantification_Results', 'test_labels')
-    prediction_dir = os.path.join(os.getcwd(), 'test_data',  model_name + '_results' + os.sep)
-    model_dir = os.path.join(os.getcwd(), 'saved_models', model_name, model_name + '.pth')
+    image_paths, label_paths = build_test_pairs(image_dir, label_dir)
 
-    img_name_list = glob.glob(image_dir + os.sep + '*')
-    print(img_name_list)
+    print("---")
+    print("test images:", len(image_paths))
+    print("test labels:", len(label_paths))
+    print("model:", model_path)
+    print("---")
 
-    label_name_list = glob.glob(label_dir + os.sep + '*')
+    test_dataset = SalObjDataset(
+        img_name_list=image_paths,
+        lbl_name_list=label_paths,
+        transform=transforms.Compose(
+            [
+                RescaleT(320),
+                ToTensorLab(flag=0),
+            ]
+        ),
+    )
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=1,
+        shuffle=False,
+        num_workers=1,
+    )
 
-    # --------- 2. dataloader ---------
-    test_salobj_dataset = SalObjDataset(img_name_list = img_name_list,
-                                        lbl_name_list = label_name_list,
-                                        transform=transforms.Compose([RescaleT(320),
-                                                                      ToTensorLab(flag=0)])
-                                        )
-    test_salobj_dataloader = DataLoader(test_salobj_dataset,
-                                        batch_size=1,
-                                        shuffle=False,
-                                        num_workers=1)
-
-    # --------- 3. model define ---------
-    net = UIUNET(3,1)
-
-    if torch.cuda.is_available():
-        net.load_state_dict(torch.load(model_dir))
-        net.cuda()
-    else:
-        net.load_state_dict(torch.load(model_dir, map_location='cpu'))
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    net = UIUNET(3, 1)
+    state_dict = torch.load(model_path, map_location=device)
+    net.load_state_dict(state_dict)
+    net.to(device)
     net.eval()
 
-    # --------- 4. inference for each image ---------
+    # Keep the metric implementations and thresholds from the released code.
     iou_metric = SigmoidMetric()
-    nIoU_metric = SamplewiseSigmoidMetric(1, score_thresh=0.55)
+    niou_metric = SamplewiseSigmoidMetric(1, score_thresh=0.55)
     iou_metric.reset()
-    nIoU_metric.reset()
-    best_iou = 0
-    best_nIoU = 0
-    total_iou = 0
-    total_niou = 0
-    # t0 = 0.0
-    # seen = 0
-    #####################
-    for i_test, data_test in enumerate(test_salobj_dataloader):
-        # seen += 1
-        print("inferencing:", img_name_list[i_test].split(os.sep)[-1])
-        inputs_test = data_test['image']
-        inputs_test = inputs_test.type(torch.FloatTensor)
-        if torch.cuda.is_available():
-            inputs_test = Variable(inputs_test.cuda())
-        else:
-            inputs_test = Variable(inputs_test)
+    niou_metric.reset()
 
-        d1, d2, d3, d4, d5, d6, d7 = net(inputs_test)
+    with torch.no_grad():
+        for index, sample in enumerate(test_loader):
+            image_name = os.path.basename(image_paths[index])
+            print(f"[{index + 1:02d}/20] inferencing: {image_name}")
 
-        # normalization
-        pred = d1[:, 0, :, :]
-        pred = normPRED(pred)
+            inputs = sample["image"].float().to(device)
+            labels = sample["label"].float().cpu()
 
-        # iou/niou
-        labels = data_test['label'].cpu()
-        output = pred.unsqueeze(0).cpu()
-        iou_metric.update(output, labels)
-        nIoU_metric.update(output, labels)
-        _, IoU = iou_metric.get()
-        _, nIoU = nIoU_metric.get()
+            d0, d1, d2, d3, d4, d5, d6 = net(inputs)
+            prediction = norm_pred(d0[:, 0, :, :])
+            output = prediction.unsqueeze(1).cpu()
 
+            iou_metric.update(output, labels)
+            niou_metric.update(output, labels)
 
-    if IoU > best_iou:
-        best_iou = IoU
-    if nIoU > best_nIoU:
-        best_nIoU = nIoU
+            del d0, d1, d2, d3, d4, d5, d6
 
-    total_iou = total_iou + IoU
-    total_niou = total_niou + nIoU
+    pixel_accuracy, iou = iou_metric.get()
+    _, niou = niou_metric.get()
 
-    del d1,d2,d3,d4,d5,d6,d7
+    iou = float(iou)
+    niou = float(niou)
+    pixel_accuracy = float(pixel_accuracy)
 
-    IoU=total_iou/20
-    nIoU=total_niou/20
-    print(IoU, nIoU)
-    print(best_iou, best_nIoU)
+    print("--- SIRST paper test result ---")
+    print(f"Pixel accuracy: {pixel_accuracy:.6f}")
+    print(f"IoU:            {iou:.6f}")
+    print(f"nIoU:           {niou:.6f}")
+    print("Paper reference: IoU=0.7825, nIoU=0.7515")
+
+    metrics_path = os.path.join(result_dir, "metrics.txt")
+    with open(metrics_path, "w", encoding="utf-8") as stream:
+        stream.write("UIU-Net SIRST test: Misc_408 to Misc_427\n")
+        stream.write(f"Pixel accuracy: {pixel_accuracy:.6f}\n")
+        stream.write(f"IoU: {iou:.6f}\n")
+        stream.write(f"nIoU: {niou:.6f}\n")
+        stream.write("Paper reference: IoU=0.7825, nIoU=0.7515\n")
+
+    print("metrics saved to:", metrics_path)
 
 
 if __name__ == "__main__":
